@@ -25,7 +25,7 @@ def get_optimizer(configs, model):
     scheduler_config = configs['scheduler']
     scheduler_method = scheduler_config['scheduler']
                 
-    if scheduler_config == 'step_lr':
+    if scheduler_method == 'step_lr':
         scheduler = torch.optim.lr_scheduler.StepLR(
                     optimizer, 
                     step_size=scheduler_config['lr_decay_epochs'], 

@@ -14,29 +14,35 @@ class Post_Processing():
         # joint1, joint2, joint1-joint2 pair id
         self.joint_pair_list = [(0, 2, 5), (1, 2, 6), (2, 3, 7), (3, 4, 8)]
 
-    def run(self, heatmap):
-        candidates = self.bipartite_graph_matching(heatmap)
-        parsed = self.parsing(candidates)
+    def run(self, bacth_iamges):
+        result_batches = []
+        for heatmap in bacth_iamges:
+            heatmap = np.transpose(heatmap, (1,2,0))
+            candidates = self.bipartite_graph_matching(heatmap)
+            parsed = self.parsing(candidates)
 
-        self.parse_failed = False
-        final_prediction = [[] for i in range(self.num_parts)]  
-        if len(parsed) == 2:
-            inst1, inst2 = parsed
-            final_prediction = list(zip(inst1, inst2))
-        elif len(parsed) == 1:
-            final_prediction = parsed
-        else:
-            self.parse_failed = True
-            for i, pair in enumerate(candidates):
-                # print(pair[0][0])
-                if len(pair) >= 2:
-                    final_prediction[i] = [pair[0][0], pair[0][1]]
-                elif len(pair) == 1:
-                    final_prediction[i] = [pair[0][0]]
-                else:
-                    final_prediction[i] = []
-
-        return final_prediction
+            self.parse_failed = False
+        
+            if len(parsed) == 2:
+                inst1, inst2 = parsed
+                final_prediction = list(zip(inst1, inst2))
+            elif len(parsed) == 1:
+                final_prediction = list(zip((*parsed)))#parsed
+            else:
+                final_prediction = [[], [], [], [], []] 
+                self.parse_failed = True
+                for i, pair in enumerate(candidates):
+                    # print(pair[0][0])
+                    if len(pair) >= 2:
+                        final_prediction[i] = [pair[0][0], pair[0][1]]
+                    elif len(pair) == 1:
+                        final_prediction[i] = [pair[0][0]]
+                    else:
+                        final_prediction[i] = []
+            # inst = len(parsed)
+            # result_batches.append(list(zip(*parsed)))
+            result_batches.append(final_prediction)
+        return result_batches
 
     def pred_init(self, heatmap):
         _, heatmap[:, :, :self.num_parts] = nms(heatmap[:, :, :self.num_parts], self.num_parts)

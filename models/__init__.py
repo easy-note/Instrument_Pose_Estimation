@@ -1,5 +1,5 @@
-from .endovis_model import endovis_model
+from .detection_subnetwork import base_models
 
 model_dict = {
-    'endovis_model' : endovis_model,
+    'detection_subnetwork' : base_models,
 }

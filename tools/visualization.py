@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 from utils.line_integral import get_points
-class visualization():
+class Visualization():
     def __init__(self, img_path=None, gt_path=None, pred_path=None, dest_path=None):
         self.img_path = img_path
         self.gt_path = gt_path 

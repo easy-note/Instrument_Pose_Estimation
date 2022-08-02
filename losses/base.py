@@ -10,12 +10,24 @@ class Losses():
       
 
     def set_loss(self, idx):
-        if self.method == 'crossentropy':
+        if self.method[idx] == 'crossentropy':
             loss = nn.CrossEntropyLoss(weight=self.weight[idx], label_smoothing=self.label_smoothing[idx])
-        elif self.method == 'mse':
+       
+        elif self.method[idx] == 'mse':
             loss = nn.MSELoss()
 
         return loss
         
     def select_loss(self):
-        return [self.set_loss(idx) for idx in range(self.method)]
+        return [self.set_loss(idx) for idx in range(len(self.method))]
+
+
+
+
+
+
+
+
+
+
+

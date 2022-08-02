@@ -6,14 +6,14 @@ from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-
+from dataload import get_dataloaders
 from models import model_dict
-from losses import get_losses
+from losses import get_losses, get_activation
 from scheduler import get_optimizer
 
 
 # from dataload.augmentation import augmentation_dict
-from dataload import dataload_dict
+
 
 from tools.metric import save_path, Logger, AverageMeter
 from tools.metric import instrument_pose_metric
@@ -31,6 +31,8 @@ from tqdm import tqdm
 
 class InstruemntPoseEstimation():
     def __init__(self, configs):
+        configs['results'] = '/raid/results/optimal_surgery/detection_only'
+
         self.configs = configs
 
         # Detect devices
@@ -38,14 +40,13 @@ class InstruemntPoseEstimation():
         self.device = torch.device("cuda" if use_cuda else "cpu")   # use CPU or GPU
 
         # defualt setting
-        self.epochs = configs['epochs']
-        
-        # data load
-        self.train_loader, self.valid_loader = dataload_dict(configs)
-        self.batch_size = configs['batch_size']
+        self.epochs = configs['optimization']['epochs']
+            
+        self.train_loader, self.valid_loader, _ = get_dataloaders(configs)
+        self.batch_size = configs['dataset']['batch_size']
 
         # model load
-        self.model = model_dict(configs['model'])
+        self.model = model_dict[configs['model']['method']](configs=configs)
       
         # set optimiation / scheduler
         self.optimizer, self.scheduler = get_optimizer(configs, self.model)
@@ -58,13 +59,12 @@ class InstruemntPoseEstimation():
         
         
     def record_set(self):
-        opt = self.opt
         # record training process
-        self.savePath, self.date_method, self.save_model_path  = save_path(configs)
+        self.savePath, self.date_method, self.save_model_path  = save_path(self.configs)
         self.train_logger = Logger(os.path.join(self.savePath, self.date_method, 'train.log'),
                                         ['epoch', 'loss', 'lr'])
         self.val_logger = Logger(os.path.join(self.savePath, self.date_method, 'val.log'),
-                                        ['epoch', 'loss', 'acc', 'best_acc', 'lr'])
+                                        ['epoch', 'loss', 'metric', 'best_metric', 'lr'])
 
         self.writer = SummaryWriter(os.path.join(self.savePath, self.date_method,'logfile'))
         
@@ -72,8 +72,9 @@ class InstruemntPoseEstimation():
 
     def loss_function(self):
 
-        self.losses = loss_dict(self.configs['loss'])
-        self.metric = minstrument_pose_metric(self.configs)
+        self.losses = get_losses(self.configs['loss'])
+        self.activation = get_activation(self.configs['loss'])
+        self.metric = instrument_pose_metric(self.configs)
 
 
     def train(self, epoch):
@@ -85,7 +86,7 @@ class InstruemntPoseEstimation():
         N_count = 0          
         
 
-        for batch_idx, (images, labels, index) in enumerate(self.train_loader):
+        for batch_idx, (images, labels) in enumerate(self.train_loader):
             images = images.cuda()
             labels = [i.cuda() for i in labels]
             N_count+= images.size(0)
@@ -96,7 +97,10 @@ class InstruemntPoseEstimation():
             outputs  = self.model(images)
             loss = 0
             for i in range(len(outputs)):
+                if self.activation is not None:
+                    outputs[i] = self.activation(outputs[i])
                 loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
+
 
                 
             self.train_losses.update(loss.item(), images.size()[0])
@@ -113,12 +117,15 @@ class InstruemntPoseEstimation():
         self.model.eval()
 
         self.val_losses = AverageMeter()
-        self.val_scores = AverageMeter()
+        # LeftClasperPoint, RightClasperPoint, HeadPoint, ShaftPoint, EndPoint
+        self.leftclasper, self.rightclasper, self.head, self.shaft, self.end = AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter()
+        # self.val_scores = AverageMeter()
 
         N_count = 0          
         
 
-        for batch_idx, (images, labels, index) in enumerate(self.train_loader):
+        for batch_idx, (images, labels) in enumerate(self.train_loader):
+
             images = images.cuda()
             labels = [i.cuda() for i in labels]
             N_count+= images.size(0)
@@ -129,25 +136,37 @@ class InstruemntPoseEstimation():
             outputs  = self.model(images)
             loss = 0
             for i in range(len(outputs)):
+                if self.activation is not None:
+                    outputs[i] = self.activation(outputs[i])
                 loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
 
                 
             self.val_losses.update(loss.item(), images.size()[0])
 
-            parsing = self.post_processing.run(outputs[-1])
-            step_score = self.metric(parsing, labels[-1].data)["RMSE"]
-            self.val_scores.update(step_score,images.size()[0])        
+            parsing = self.post_processing.run(outputs[-1].detach().cpu().numpy())
+            target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy())
+      
+            step_score = self.metric.forward(parsing, target_parsing)["F1"]
+            # print(step_score)
+            leftclasper, rightclasper, head, shaft, end = step_score
+            
+            self.leftclasper.update(leftclasper, 1)    
+            self.rightclasper.update(rightclasper, 1)    
+            self.head.update(head, 1)    
+            self.shaft.update(shaft, 1)    
+            self.end.update(end, 1)    
+            # self.val_scores.update(step_score, 1)        
         
             loss.backward()
             self.optimizer.step()
 
-            if (batch_idx) % 10 == 0:      
-                print('Val Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}, Accu: {:.2f}%'.format(
-                    epoch, N_count, len(self.val_loader.dataset), 100. * (batch_idx + 1) / len(self.val_loader), self.val_losses.avg, self.val_scores.avg))
+
+        print('Val Epoch: {} \tLoss: {:.6f}, F1 left: {:.2f}%\t rigth: {:.2f}%\t head: {:.2f}%\t shaft: {:.2f}%\t end: {:.2f}%'.format(
+                epoch, self.val_losses.avg, self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg))#self.val_scores.avg))
    
-        return self.val_losses, self.val_scores
     def fit(self):
-        
+  
+
         self.model.to(self.device)
         # start training
         best_acc = 0
@@ -155,9 +174,10 @@ class InstruemntPoseEstimation():
             # train, test model
             self.train(epoch)
             train_losses = self.train_losses
-
-            test_losses, test_scores = validation(epoch)
-            self.scheduler.step()
+            self.validation(epoch)
+            test_losses, test_scores = self.val_losses, (self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg)
+            # if self.scheduler is not None:
+            #     self.scheduler.step()
             
             # plot average of each epoch loss value
             self.train_logger.log({
@@ -165,39 +185,39 @@ class InstruemntPoseEstimation():
                             'loss': train_losses.avg,
                             'lr': self.optimizer.param_groups[0]['lr']
                         })
-            if best_acc < test_scores.avg:
-                best_acc = test_scores.avg
+            if best_acc < np.nanmean(test_scores):
+                best_acc = np.nanmean(test_scores)#test_scores.avg
                 torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'student_best.pth'))
             self.val_logger.log({
                             'epoch': epoch,
                             'loss': test_losses.avg,
-                            'metric': test_scores.avg,
+                            'metric': np.nanmean(test_scores), #test_scores.avg,
                             'best_metric' : best_acc,
                             'lr': self.optimizer.param_groups[0]['lr']
                         })
             self.writer.add_scalar('Loss/train', train_losses.avg, epoch)
             self.writer.add_scalar('Loss/test', test_losses.avg, epoch)
             
-            self.writer.add_scalar('scores/train', train_scores.avg, epoch)
-            self.writer.add_scalar('scores/test', test_scores.avg, epoch)
+         
+            self.writer.add_scalar('scores/test',np.nanmean(test_scores),  epoch) #test_scores.avg,
             torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'student_lastest.pth'))  # save spatial_encoder
        
 
 import argparse
-import mmcv
+from mmcv import Config
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     'configs',
     default='./dataset/', type=str, help='Root of directory path of data'
     )
-args = parser.parse_args()
+
 if __name__ == '__main__':
-    args = parse_args()
+    args = parser.parse_args()
 
-    cfg = Config.fromfile(args.config)
+    cfg = Config.fromfile(args.configs)
 
-    cfg.merge_from_dict(args.cfg_options)
+    # cfg.merge_from_dict(args.cfg_options)
     
     IPE = InstruemntPoseEstimation(cfg)
     IPE.fit()

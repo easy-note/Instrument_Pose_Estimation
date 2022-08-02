@@ -4,14 +4,16 @@ from .unet_parts import *
 import torch
 
 class DetectionSubnetwork(nn.Module):
-    def __init__(self, n_channels, n_classes, bilinear=False):
+    def __init__(self, configs):#n_channels, n_classes, bilinear=False):
         super(DetectionSubnetwork, self).__init__()
-        self.n_channels = n_channels
-        self.n_classes = n_classes
-        
-        self.bilinear = bilinear
 
-        self.down1 = CBR(in_channels=n_channels, out_channels=64, kernel_size=3)
+        self.n_channels = configs['model']['n_channels']
+        self.bilinear = configs['model']['bilinear']
+        self.n_classes = configs['dataset']['num_parts'] + configs['dataset']['num_connections'] 
+        
+        n_places = self.n_channels
+
+        self.down1 = CBR(in_channels=3, out_channels=self.n_channels, kernel_size=3)
         
         self.down2_b1_sbr = SBR(in_channels=64, out_channels=64, kernel_size=2, stride=2)
         self.down2_b2_sbr = SBR(in_channels=64, out_channels=64, kernel_size=2, stride=2)
@@ -28,7 +30,7 @@ class DetectionSubnetwork(nn.Module):
         self.down4_b1_sbr = SBR(in_channels=256, out_channels=256, kernel_size=2, stride=2)
         self.down4_b2_sbr = SBR(in_channels=256, out_channels=256, kernel_size=2, stride=2)
         self.down4_b1_cbr = CBR(in_channels=256, out_channels=256, kernel_size=3)
-        self.down4_b2_cbr = CBR(in_channels=256, out_channels=25, kernel_size=3)
+        self.down4_b2_cbr = CBR(in_channels=256, out_channels=256, kernel_size=3)
         self.down4_cbr = CBR(in_channels=512, out_channels=512, kernel_size=1, padding=0)
 
         self.down5_b1_sbr = SBR(in_channels=512, out_channels=512, kernel_size=2, stride=2)
@@ -62,7 +64,7 @@ class DetectionSubnetwork(nn.Module):
         self.up4_b2_cbr = CBR(in_channels=32, out_channels=32, kernel_size=3)
         self.up4_cbr = CBR(in_channels=64, out_channels=64, kernel_size=1, padding=0)
 
-        self.cbs = CBS(in_channels=64, out_channels=9, kernel_size=1, padding=0)
+        self.cbs = CBS(in_channels=64, out_channels=self.n_classes, kernel_size=1, padding=0)
 
 
     def forward(self, x):
@@ -128,5 +130,11 @@ class DetectionSubnetwork(nn.Module):
 
         logits = self.cbs(x9) # torch.Size([10, 9, 512, 512])
         
-        return logits
+        return [logits]
         
+
+
+def base_models(configs, **kwargs):
+    print(configs)
+    model = DetectionSubnetwork(configs, **kwargs)
+    return model 

@@ -10,11 +10,15 @@ import torch
 def save_path(configs):
 
     date = datetime.today().strftime("%Y%m%d%H%M") 
-    dataset = configs['dataset']['method']
+    dataset = configs['dataset']['dataset']
     model = configs['model']['method']
     date_method = os.path.join(dataset, model, date)
-    
-    result_path = configs['result']
+    if 'results' in configs.keys():
+        print( configs['results'])
+    else:
+        for key in configs:
+            print(key, configs[key])
+    result_path = configs['results']
             
     if not os.path.exists(os.path.join(result_path, date_method)):
         os.makedirs(os.path.join(result_path, date_method))

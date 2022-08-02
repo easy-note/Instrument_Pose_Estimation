@@ -15,8 +15,8 @@ class instrument_pose_metric():
         self.joint_num = configs['dataset']['num_parts'] 
 
     def forward(self, preds, targets):
-        preds = preds.cpu().numpy()
-        targets = targets.cpu().numpy()
+        # preds = preds.cpu().numpy()
+        # targets = targets.cpu().numpy()
         false_pos = np.zeros((5, ), dtype=np.float32)
         false_neg = np.zeros((5, ), dtype=np.float32)
         true_pos = np.zeros((5, ), dtype=np.float32)
@@ -26,19 +26,26 @@ class instrument_pose_metric():
 
         precision = lambda fp, tp: tp / (tp + fp)
         recall = lambda fn, tp: tp / (tp + fn)
+
+        # array order : batch * [[left, right, head, shaft, end], [left, right, head, shaft, end], [left, right, head, shaft, end], ...]
+        # array order : batch *[[left1, left2, left3, ...], [right1, right2, right3, ...], ...]
+ 
         for batch_idx in range(len(preds)):
             pred = preds[batch_idx]
             target = targets[batch_idx]
             for k in range(self.joint_num):
-           
+      
                 cost_matrix = np.zeros((len(target[k]), len(pred[k])), dtype=np.float32)
-            
+
    
                 for real_i, e_true in enumerate(target[k]):
                     for pred_j, e_pred in enumerate(pred[k]):  # (preds[k]):
-        
-            
-                        cost_matrix[real_i, pred_j] = ((e_pred[0] - e_true[0])) ** 2 + ((e_pred[1] - e_true[1])) ** 2
+               
+                        if len(e_pred) == 0:
+                            cost_matrix[real_i, pred_j] = 1e9
+                        else:
+                            # print(e_pred, e_true)
+                            cost_matrix[real_i, pred_j] = ((e_pred[0] - e_true[0])) ** 2 + ((e_pred[1] - e_true[1])) ** 2
           
             
                 row_idx, col_idx = linear_sum_assignment(cost_matrix)
@@ -50,7 +57,7 @@ class instrument_pose_metric():
                     # check true positive and additional false positive
                     mae[k] += np.sqrt(cost_matrix[r, c])
                     counter[k] += 1
-                    print(np.sqrt(cost_matrix[r, c]))
+
                     if np.sqrt(cost_matrix[r, c]) < self.threshold:
                         rmse[k] += cost_matrix[r, c]
                         true_pos[k] += 1
