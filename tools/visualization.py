@@ -7,11 +7,8 @@ import numpy as np
 
 from utils.line_integral import get_points
 class Visualization():
-    def __init__(self, img_path=None, gt_path=None, pred_path=None, dest_path=None):
-        self.img_path = img_path
-        self.gt_path = gt_path 
-        self.gt_list =  glob(os.path.join(gt_path, '*.json')) if gt_path is not None else None
-        self.pred_path = pred_path 
+    def __init__(self, mode='test', dest_path=None):
+
         self.dest_path = dest_path
 
         # LeftClasperPoint, RightClasperPoint, HeadPoint, ShaftPoint, EndPoint (0,1,2,3,4)
@@ -21,7 +18,7 @@ class Visualization():
         
         self.joint_color = ['r', 'y', 'g', 'b', 'm']
 
-    def list_load(self):
+    def list_load(self): # GT annotation 읽기 
         for filename in self.gt_list:
 
             gt = pd.read_json(filename)

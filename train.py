@@ -137,13 +137,14 @@ class InstruemntPoseEstimation():
             loss = 0
             for i in range(len(outputs)):
                 if self.activation is not None:
+                    heatmap = outputs[i].clone()
                     outputs[i] = self.activation(outputs[i])
                 loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
 
                 
             self.val_losses.update(loss.item(), images.size()[0])
 
-            parsing = self.post_processing.run(outputs[-1].detach().cpu().numpy())
+            parsing = self.post_processing.run(heatmap.detach().cpu().numpy())
             target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy())
       
             step_score = self.metric.forward(parsing, target_parsing)["F1"]

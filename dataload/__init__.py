@@ -12,7 +12,7 @@ __all__ = [
 '''
 dataset['img_size'] = (256,320)
 '''
-def get_dataloaders(configs, mode):
+def get_dataloaders(configs):
     configs = configs['dataset'] 
     
     

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 from models import model_dict
 
-
+from tools.metric import save_path, Logger, AverageMeter
 from tools.post_processing import Post_Processing
 from tools.visualization import Visualization
 
@@ -19,6 +19,7 @@ import os
 import numpy as np
 import random 
 from tqdm import tqdm 
+from PIL import Image
 
 
 import albumentations as A
@@ -26,15 +27,17 @@ import albumentations.pytorch as AP
 
 class InferenceInstruemntPoseEstimation():
     def __init__(self, configs, args):
-        self.configs = configs
-
+        self.cfs = configs
+        
         # Detect devices
         use_cuda = torch.cuda.is_available()                   # check if GPU exists
         self.device = torch.device("cuda" if use_cuda else "cpu")   # use CPU or GPU
         # Dataload
         self.datalist = configs['dataset']['images']
-        self.transforms = self.get_transforms(configs)
-
+        if self.datalist is None:
+            self.datalist = [args.img_path]
+        self.transforms = A.Compose(self.get_transforms(configs))
+        
         # model load
         self.model = model_dict[configs['model']['method']](configs=configs)
         checkpoint = torch.load(configs['model']['checkpoint'])
@@ -42,20 +45,19 @@ class InferenceInstruemntPoseEstimation():
         self.model.load_state_dict(state_dict)
         self.model.to(self.device)
 
-        # set optimiation / scheduler
-        self.record_set()
-        self.loss_function()
 
         # instrument parsing
         self.post_processing = Post_Processing(configs['dataset']['num_parts'],  configs['dataset']['num_connections'])
-        self.visualization = Visualization(dest_path = configs['dest_path'])
+        self.visualization = Visualization(dest_path = configs.dest_path)
+
+        self.root = configs['dataset']['root']
         
     
     def get_transforms(self, configs):
         width, height = configs['dataset']['img_size']
         trans = [A.Resize(width=width, height=height )]
 
-        for method in configs['dataset']['augmentation'][mode]:
+        for method in configs['dataset']['augmentation']['test']:
             if method == 'verticalflip':
                 trans.append(A.VerticalFlip(0.5))
             elif method == 'horizonflip':
@@ -69,27 +71,19 @@ class InferenceInstruemntPoseEstimation():
         return trans
 
 
-    def inference(self, images, filenames):
-        self.model.eval()
-        images = self.transforms(image=images)
-        outputs  = self.model(images)
-            
+    def imageopen(self, image_path):
+        return np.array(Image.open(image_path)) 
 
-        parsing = self.post_processing.run(outputs[-1].detach().cpu().numpy())
-        self.visualization.run(parsing, filenames) # visualization instrument keypoint & save filename.png
-    
-   
-    def run(self):
-  
-        best_acc = 0
-        
-        
-        self.testing(epoch)
-        test_losses, test_scores = self.val_losses, (self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg)
-        self.test_logger.log({
-                            'loss': test_losses.avg,
-                            'metric': np.nanmean(test_scores), 
-                        })
+    def inference(self):
+        self.model.eval()
+
+        for filename in self.datalist:
+            image = self.imageopen(os.path.join(self.root, filename))
+            image = self.transforms(image=image)['image'].to(self.device).unsqueeze(0)
+            outputs = self.model(image)
+            parsing = self.post_processing.run(outputs[-1].detach().cpu().numpy())
+            self.visualization.show(image.squeeze().permute(1,2,0).detach().cpu().numpy(), parsing, filename)
+
        
 
 import argparse
@@ -104,12 +98,10 @@ parser.add_argument(
     '--img_path',
     default='/raid/datasets/public/EndoVisPose/Training/test/image/img_0250_test5.jpg', type=str, help='Root of directory path of data'
     )
+
 if __name__ == '__main__':
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.configs)
-
-    # cfg.merge_from_dict(args.cfg_options)
-    
-    IPE = TestInstruemntPoseEstimation(cfg)
-    IPE.run()
+    IPE = InferenceInstruemntPoseEstimation(cfg, args)
+    IPE.inference()
