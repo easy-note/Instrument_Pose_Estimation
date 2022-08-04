@@ -13,10 +13,14 @@ dataset['images_dir'] = {
     'train': '/raid/datasets/public/EndoVisPose/Training/training/image', 
     'val': '/raid/datasets/public/EndoVisPose/Training/test/image',
     'test': '/raid/datasets/public/EndoVisPose/Training/test/image'}
-dataset['masks_dir'] = {
-    'train': '/raid/datasets/public/EndoVisPose/Training/training/label', 
-    'val': '/raid/datasets/public/EndoVisPose/Training/test/label',
-    'test': '/raid/datasets/public/EndoVisPose/Training/test/label'}
+dataset['seg_masks_dir'] = {
+    'train': '/raid/datasets/public/EndoVisPose/Training/training/labels_jh/segmentation', 
+    'val': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/segmentation',
+    'test': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/segmentation'}
+dataset['regress_masks_dir'] = {
+    'train': '/raid/datasets/public/EndoVisPose/Training/training/labels_jh/regression', 
+    'val': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression',
+    'test': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression'}
 
 dataset['augmentation'] = dict() 
 dataset['augmentation']['train'] = ['verticalflip', 'horizonflip']
@@ -51,7 +55,7 @@ configs['scheduler'] = scheduler
 # Loss
 loss = dict()
 
-loss['method'] = ['bce']
+loss['method'] = ['bce', 'mse']
 loss['activation'] = 'sigmoid'
 loss['reduction'] = 'mean'
 loss['weight'] = [ None]
@@ -60,7 +64,8 @@ configs['loss'] = loss
 
 # Model
 model = dict()
-model['method'] = 'detection_subnetwork'
+# model['method'] = 'detection_subnetwork'
+model['method'] = 'endovis_network'
 model['n_channels'] = 64
 model['bilinear'] = False
 configs['model'] = model
@@ -75,5 +80,3 @@ configs['metric'] = metric
 # Defuat
 configs['results'] = '/raid/results/optimal_surgery/detection_only'
 
-
-configs['results'] = '/raid/results/optimal_surgery/detection_only'

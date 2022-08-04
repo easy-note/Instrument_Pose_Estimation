@@ -47,7 +47,7 @@ class InstruemntPoseEstimation():
 
         # model load
         self.model = model_dict[configs['model']['method']](configs=configs)
-      
+   
         # set optimiation / scheduler
         self.optimizer, self.scheduler = get_optimizer(configs, self.model)
         self.record_set()
@@ -72,7 +72,7 @@ class InstruemntPoseEstimation():
 
     def loss_function(self):
 
-        self.losses = get_losses(self.configs['loss'])
+        self.losses = get_losses(self.configs['loss']) # self.losses :  [BCELoss(), MSELoss()]
         self.activation = get_activation(self.configs['loss'])
         self.metric = instrument_pose_metric(self.configs)
 
@@ -80,29 +80,39 @@ class InstruemntPoseEstimation():
     def train(self, epoch):
         self.model.train()
     
-
         self.train_losses = AverageMeter()
 
-        N_count = 0          
-        
+        N_count = 0              
 
-        for batch_idx, (images, labels) in enumerate(self.train_loader):
+        for batch_idx, (images, seg_labels, regress_labels) in enumerate(self.train_loader):
             images = images.cuda()
-            labels = [i.cuda() for i in labels]
+            seg_labels = [i.cuda() for i in seg_labels]
+            regress_labels = [i.cuda() for i in regress_labels]
             N_count+= images.size(0)
     
-
             self.optimizer.zero_grad()
 
-            outputs  = self.model(images)
+            seg_outputs, regress_outputs = self.model(images) # [data1, data2, data3, ..., data batch]
+            # print('detect_outputs : ', seg_outputs[0].shape) # torch.Size([32, 9, 320, 256])
+            # print('regress_outputs : ', regress_outputs[0].shape) # torch.Size([32, 9, 320, 256])
+
             loss = 0
-            for i in range(len(outputs)):
+            for i in range(len(regress_outputs)): # len(regression_outputs) = 1
                 if self.activation is not None:
-                    outputs[i] = self.activation(outputs[i])
-                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
+                    seg_outputs[i] = self.activation(seg_outputs[i])
+
+                # print('seg_labels[i] : ', seg_labels[i].shape)
+                # print('regress_labels[i] : ', regress_labels[i].shape)
+
+                loss += self.losses[0](seg_outputs[i], seg_labels[i]) # detection loss + regression loss
+                loss += self.losses[1](regress_outputs[i], regress_labels[i]) # detection loss + regression loss
+                # loss += self.losses[i](regress_outputs[i], regress_labels[i]) # detection loss + regression loss
+
+                # print(loss)
+
+                # exit(0)
 
 
-                
             self.train_losses.update(loss.item(), images.size()[0])
 
         
@@ -124,28 +134,31 @@ class InstruemntPoseEstimation():
         N_count = 0          
         
 
-        for batch_idx, (images, labels) in enumerate(self.train_loader):
+        for batch_idx, (images, seg_labels, regress_labels) in enumerate(self.valid_loader): # self.train_loader -> self.valid_loader
 
             images = images.cuda()
-            labels = [i.cuda() for i in labels]
+            seg_labels = [i.cuda() for i in seg_labels]
+            regress_labels = [i.cuda() for i in regress_labels]
             N_count+= images.size(0)
     
-
             self.optimizer.zero_grad()
 
-            outputs  = self.model(images)
+            seg_outputs, regress_outputs  = self.model(images)
             loss = 0
-            for i in range(len(outputs)):
-                if self.activation is not None:
-                    heatmap = outputs[i].clone()
-                    outputs[i] = self.activation(outputs[i])
-                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
-
+            for i in range(len(regress_outputs)):
+                if self.activation is not None:    
+                    seg_outputs[i] = self.activation(seg_outputs[i])
                 
+                heatmap = regress_outputs[i].clone()
+
+                loss += self.losses[0](seg_outputs[i], seg_labels[i]) # detection loss + regression loss
+                loss += self.losses[1](regress_outputs[i], regress_labels[i]) # detection loss + regression loss
+
             self.val_losses.update(loss.item(), images.size()[0])
 
             parsing = self.post_processing.run(heatmap.detach().cpu().numpy())
-            target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy())
+            # target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy())
+            target_parsing = self.post_processing.run(regress_outputs[-1].detach().cpu().numpy())
       
             step_score = self.metric.forward(parsing, target_parsing)["F1"]
             # print(step_score)

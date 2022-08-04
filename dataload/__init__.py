@@ -24,6 +24,7 @@ def get_dataloaders(configs):
         train_set = EndovisDataset(configs, transforms = train_transform)
         valid_set = EndovisDataset(configs, transforms = val_transform)
         test_set = EndovisDataset(configs, transforms = test_transform)
+        
     train_loader = DataLoader(
                 train_set,
                 batch_size=configs['batch_size'],

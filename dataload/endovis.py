@@ -19,9 +19,11 @@ dataset['pin_memory'] = True
 class EndovisDataset(Dataset):
     def __init__(self, configs,  state: str = 'train', transforms=None):
         images_dir = configs['images_dir'][state]
-        masks_dir = configs['masks_dir'][state]
+        seg_masks_dir = configs['seg_masks_dir'][state]
+        regress_masks_dir = configs['regress_masks_dir'][state]
         self.images_dir = Path(images_dir)
-        self.masks_dir = Path(masks_dir)
+        self.seg_masks_dir = Path(seg_masks_dir)
+        self.regress_masks_dir = Path(regress_masks_dir)
         self.transforms = transforms
 
         self.ids = [splitext(file)[0] for file in listdir(images_dir) if not file.startswith('.')]
@@ -47,19 +49,24 @@ class EndovisDataset(Dataset):
 
     def __getitem__(self, idx):
         name = self.ids[idx]
-        mask_file = list(self.masks_dir.glob(name + '.*'))
+        
         img_file = list(self.images_dir.glob(name + '.*'))
-
+        seg_mask_file = list(self.seg_masks_dir.glob(name + '.*'))
+        regress_mask_file = list(self.regress_masks_dir.glob(name + '.*'))
+        
         assert len(img_file) == 1, f'Either no image or multiple images found for the ID {name}: {img_file}'
-        assert len(mask_file) == 1, f'Either no mask or multiple masks found for the ID {name}: {mask_file}'
-
+        assert len(seg_mask_file) == 1, f'Either no mask or multiple masks found for the ID {name}: {seg_mask_file}'
+        assert len(regress_mask_file) == 1, f'Either no mask or multiple masks found for the ID {name}: {regress_mask_file}'
+        
         img = self.load(img_file[0])
-        label = self.load(mask_file[0])
+        seg_label = self.load(seg_mask_file[0])
 
+        regress_label = self.load(regress_mask_file[0])
 
         if self.transforms is not None:
-            transformed = self.transforms(image=img, mask=label)
+            transformed = self.transforms(image=img, masks=[seg_label, regress_label])
             img = transformed['image']
-            label = transformed['mask']
+            seg_label = transformed['masks'][0]
+            regress_label = transformed['masks'][1]
 
-        return img, [label.permute(2, 0, 1)]
+        return img, [seg_label.permute(2, 0, 1)], [regress_label.permute(2, 0, 1)]

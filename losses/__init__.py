@@ -9,9 +9,6 @@ class Losses():
         self.reduction = configs['reduction']
         self.label_smoothing = configs['label_smoothing']
 
-
-      
-
     def set_loss(self, idx):
         if self.method[idx] == 'crossentropy':
             loss = nn.CrossEntropyLoss(weight=self.weight[idx], label_smoothing=self.label_smoothing[idx], reduction=self.reduction)
@@ -24,7 +21,6 @@ class Losses():
         
     def select_loss(self):
         return [self.set_loss(idx) for idx in range(len(self.method))]
-
 
 
 
