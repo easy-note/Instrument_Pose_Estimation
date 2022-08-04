@@ -1,3 +1,4 @@
+
 from utils.line_integral import *
 from utils.nms import nms
 from scipy.optimize import linear_sum_assignment
@@ -19,6 +20,7 @@ class Post_Processing():
         for heatmap in bacth_iamges:
             heatmap = np.transpose(heatmap, (1,2,0))
             candidates = self.bipartite_graph_matching(heatmap)
+
             parsed = self.parsing(candidates)
 
             self.parse_failed = False
@@ -42,6 +44,7 @@ class Post_Processing():
             # inst = len(parsed)
             # result_batches.append(list(zip(*parsed)))
             result_batches.append(final_prediction)
+        
         return result_batches
 
     def pred_init(self, heatmap):
@@ -82,7 +85,7 @@ class Post_Processing():
                     matching_scores[idx1, idx2] = compute_integral(pt1, pt2, heatmap[:, :, connection_idx])
                     # print("left2head", matching_scores)
 
- 
+
             row_idx, col_idx = linear_sum_assignment(-matching_scores) # minimum weight matching in bipartite graphs.
 
             for r, c in zip(row_idx, col_idx):
@@ -93,12 +96,14 @@ class Post_Processing():
     def parsing(self, candidates):
         # HeadPoint, ShaftPoint, EndPoint Connecting
         parsed = []
+       
         for pairs in candidates[-1]:
             shaft, end = pairs
             for next_pairs in candidates[-2]:
                 head, shaft_next = next_pairs
                 if shaft[0] == shaft_next[0] and shaft[1] == shaft_next[1]: 
                     parsed.append([head, shaft, end])
+
       
         # LeftClasperPoint, RightClasperPoint, ShaftPoint Connecting
         for i, partial_pose in enumerate(parsed):
@@ -109,10 +114,12 @@ class Post_Processing():
            
                     parsed[i].insert(0, right)
 
+
             for next_pairs in candidates[-4]:
                 left, head_next = next_pairs
                 if head[0] == head_next[0] and head[1] == head_next[1]:
                     parsed[i].insert(0, left)
+
   
         # joint 가 missing 된 부분 ()으로 채우기 
         for i, pose in enumerate(parsed):
@@ -120,23 +127,30 @@ class Post_Processing():
                 for _ in range(self.num_parts - len(pose)):
                     parsed[i].insert(0, ())
 
+
         return parsed
 
         
 
 if __name__ == "__main__":
-    gt_path = '/raid/datasets/public/EndoVisPose/annotation/training_labels_postprocessing_v2/train1/img_000175_raw_train1.npy' #train4/img_000290_raw_train4.npy' img_000175_raw_train1
+    # gt_path = '/raid/datasets/public/EndoVisPose/annotation/training_labels_postprocessing_v2/train1/img_000175_raw_train1.npy' #train4/img_000290_raw_train4.npy' img_000175_raw_train1
+    gt_path = '/instrument_pose_estimation/labels.npy'
     gt = np.load(gt_path)
-    p = post_processing(num_parts=5, num_connections=4)
 
-    heatmap = np.random.randn(576,720,9)
+    heatmap_path = '/instrument_pose_estimation/output.npy'
+    heatmap = np.load(heatmap_path)
+    
+    p = Post_Processing(num_parts=5, num_connections=4)
+
+    # heatmap = np.random.randn(576,720,9)
 
     final_prediction = p.run(gt)
 
     print(final_prediction)
+    print(len(final_prediction))
 
     tool_list = ['LeftClasperPoint', 'RightClasperPoint', 'HeadPoint', 'ShaftPoint', 'EndPoint']
-    for name, point in zip(tool_list, final_prediction):
+    for name, point in zip(tool_list, final_prediction[0]):
         print(name)
         print('tool1')
         print('x : ', point[0][0])
