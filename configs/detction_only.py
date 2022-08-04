@@ -56,7 +56,7 @@ configs['scheduler'] = scheduler
 loss = dict()
 
 loss['method'] = ['bce', 'mse']
-loss['activation'] = 'sigmoid'
+loss['activation'] = ['sigmoid', None]
 loss['reduction'] = 'mean'
 loss['weight'] = [ None]
 loss['label_smoothing'] = [0.0]

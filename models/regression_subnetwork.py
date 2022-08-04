@@ -31,7 +31,7 @@ class RegressionSubnetwork(nn.Module):
         
         logits = self.cb(x5) # torch.Size([10, 9, 512, 512])
         
-        return [logits]
+        return logits
         
 
 

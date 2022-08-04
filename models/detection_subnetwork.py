@@ -130,7 +130,7 @@ class DetectionSubnetwork(nn.Module):
 
         logits = self.cbs(x9) # torch.Size([10, 9, 320, 256])
         
-        return [logits]
+        return logits
         
 
 

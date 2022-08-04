@@ -69,4 +69,4 @@ class EndovisDataset(Dataset):
             seg_label = transformed['masks'][0]
             regress_label = transformed['masks'][1]
 
-        return img, [seg_label.permute(2, 0, 1)], [regress_label.permute(2, 0, 1)]
+        return img, [seg_label.permute(2, 0, 1), regress_label.permute(2, 0, 1)]

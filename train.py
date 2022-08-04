@@ -84,33 +84,23 @@ class InstruemntPoseEstimation():
 
         N_count = 0              
 
-        for batch_idx, (images, seg_labels, regress_labels) in enumerate(self.train_loader):
+        for batch_idx, (images, labels) in enumerate(self.train_loader):
             images = images.cuda()
-            seg_labels = [i.cuda() for i in seg_labels]
-            regress_labels = [i.cuda() for i in regress_labels]
+            labels = [i.cuda() for i in labels]
             N_count+= images.size(0)
     
             self.optimizer.zero_grad()
 
-            seg_outputs, regress_outputs = self.model(images) # [data1, data2, data3, ..., data batch]
-            # print('detect_outputs : ', seg_outputs[0].shape) # torch.Size([32, 9, 320, 256])
-            # print('regress_outputs : ', regress_outputs[0].shape) # torch.Size([32, 9, 320, 256])
-
+            outputs = self.model(images) # [[torch.Size([32, 9, 320, 256])], [torch.Size([32, 9, 320, 256])]]
+            
             loss = 0
-            for i in range(len(regress_outputs)): # len(regression_outputs) = 1
-                if self.activation is not None:
-                    seg_outputs[i] = self.activation(seg_outputs[i])
+            for i in range(len(outputs)): # len(outputs) = 2
+                if self.activation[i] is not None:
+                    outputs[i] = self.activation[i](outputs[i])
 
-                # print('seg_labels[i] : ', seg_labels[i].shape)
-                # print('regress_labels[i] : ', regress_labels[i].shape)
-
-                loss += self.losses[0](seg_outputs[i], seg_labels[i]) # detection loss + regression loss
-                loss += self.losses[1](regress_outputs[i], regress_labels[i]) # detection loss + regression loss
-                # loss += self.losses[i](regress_outputs[i], regress_labels[i]) # detection loss + regression loss
+                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
 
                 # print(loss)
-
-                # exit(0)
 
 
             self.train_losses.update(loss.item(), images.size()[0])
@@ -134,32 +124,29 @@ class InstruemntPoseEstimation():
         N_count = 0          
         
 
-        for batch_idx, (images, seg_labels, regress_labels) in enumerate(self.valid_loader): # self.train_loader -> self.valid_loader
+        for batch_idx, (images, labels) in enumerate(self.valid_loader): # self.train_loader -> self.valid_loader
 
             images = images.cuda()
-            seg_labels = [i.cuda() for i in seg_labels]
-            regress_labels = [i.cuda() for i in regress_labels]
+            labels = [i.cuda() for i in labels]
             N_count+= images.size(0)
     
             self.optimizer.zero_grad()
 
-            seg_outputs, regress_outputs  = self.model(images)
+            outputs  = self.model(images)
             loss = 0
-            for i in range(len(regress_outputs)):
-                if self.activation is not None:    
-                    seg_outputs[i] = self.activation(seg_outputs[i])
+            for i in range(len(outputs)): # len(outputs) = 2
+                if self.activation[i] is not None:
+                    outputs[i] = self.activation[i](outputs[i])
                 
-                heatmap = regress_outputs[i].clone()
-
-                loss += self.losses[0](seg_outputs[i], seg_labels[i]) # detection loss + regression loss
-                loss += self.losses[1](regress_outputs[i], regress_labels[i]) # detection loss + regression loss
-
+                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
+            
             self.val_losses.update(loss.item(), images.size()[0])
+            
+            heatmap = outputs[-1].clone() # regression
+                    
+            parsing = self.post_processing.run(heatmap.detach().cpu().numpy()) # prediction
+            target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy()) # regression gt : 정답이 json 형태 -> list 형태로 변환해야 함. 
 
-            parsing = self.post_processing.run(heatmap.detach().cpu().numpy())
-            # target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy())
-            target_parsing = self.post_processing.run(regress_outputs[-1].detach().cpu().numpy())
-      
             step_score = self.metric.forward(parsing, target_parsing)["F1"]
             # print(step_score)
             leftclasper, rightclasper, head, shaft, end = step_score
