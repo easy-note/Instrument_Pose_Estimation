@@ -11,10 +11,11 @@ import natsort
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--label_dir", default='/raid/datasets/public/EndoVisPose', help="Directory that contains the labels", type=str, required=True)
-    parser.add_argument("--save_dir", default='/SSL-2D-Pose/save', help="Directory to save the heatmaps", required=True)
+    parser.add_argument("--save_dir", default='/np_save', help="Directory to save the heatmaps", required=True)
     parser.add_argument("--dataset", type=str, default="ENDOVIS")
     parser.add_argument("--post_processing_labels", type=int, default=0,
                         help="Generate labels for post-processing module")
+    parser.add_argument("--radius", default=15, type=int)
     args = parser.parse_args()
 
     if args.dataset == "RMIT":
@@ -39,7 +40,7 @@ def ENDOVIS(args):
     num_connections = 4
 
     read_folder_name = ("train_labels", "test_labels")
-    save_folder_name = ("segmentation_training_labels", "segmentation_test_labels")
+    save_folder_name = ("segmentation_training_labels_radius15", "segmentation_test_labels_radius15")
     num_instruments = {}
 
     for i in range(2):
@@ -109,7 +110,8 @@ def ENDOVIS(args):
                         idx = mapper[e["class"]]
                         part_coord[e["class"]].append((e["x"], e["y"], e["id"]))
 
-                        seg_map[:, :, idx] += cv2.circle(np.array(seg_map[:,:, idx]), (int(e['x']), int(e['y'])), 20, (255, 0, 0), -1)
+                        # seg_map[:, :, idx] += cv2.circle(np.array(seg_map[:,:, idx]), (int(e['x']), int(e['y'])), args.radius, (255, 0, 0), -1)
+                        seg_map[:, :, idx] += cv2.circle(np.array(seg_map[:,:, idx]), (int(e['x']), int(e['y'])), args.radius, 1, -1)
                         
                         counter += 1
 
@@ -139,7 +141,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["LeftClasperPoint"][idx]
                         pt3, pt4, _ = part_coord["HeadPoint"][idx]
 
-                        seg_map[:, :, 5] += cv2.line(np.array(seg_map[:,:, 5]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 5] += cv2.line(np.array(seg_map[:,:, 5]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, args.radius)
                                          
 
                     except:
@@ -156,7 +158,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["RightClasperPoint"][idx]
                         pt3, pt4, _ = part_coord["HeadPoint"][idx]
 
-                        seg_map[:, :, 6] += cv2.line(np.array(seg_map[:,:, 6]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 6] += cv2.line(np.array(seg_map[:,:, 6]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, args.radius)
                     except:
                         pass
                     
@@ -171,7 +173,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["HeadPoint"][idx]
                         pt3, pt4, _ = part_coord["ShaftPoint"][idx]
 
-                        seg_map[:, :, 7] += cv2.line(np.array(seg_map[:,:, 7]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 7] += cv2.line(np.array(seg_map[:,:, 7]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, args.radius)
                     except:
                         pass
                     
@@ -186,7 +188,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["ShaftPoint"][idx]
                         pt3, pt4, _ = part_coord["EndPoint"][idx]
 
-                        seg_map[:, :, 8] += cv2.line(np.array(seg_map[:,:, 8]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 8] += cv2.line(np.array(seg_map[:,:, 8]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, args.radius)
                     except:
                         pass                 
 
@@ -232,4 +234,8 @@ def visaul(set_no):
 
 if __name__ == "__main__":
     # main()
-    visaul(4)
+    # visaul(4)
+
+    import numpy as np
+    n = np.load('/raid/datasets/public/EndoVisPose/annotation/regression_train_labels_raduis20/train1/img_001105_raw_train1.npy')
+    print(n)
