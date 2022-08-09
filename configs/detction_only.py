@@ -13,10 +13,14 @@ dataset['images_dir'] = {
     'train': '/raid/datasets/public/EndoVisPose/Training/training/image', 
     'val': '/raid/datasets/public/EndoVisPose/Training/test/image',
     'test': '/raid/datasets/public/EndoVisPose/Training/test/image'}
-dataset['masks_dir'] = {
-    'train': '/raid/datasets/public/EndoVisPose/Training/training/label', 
-    'val': '/raid/datasets/public/EndoVisPose/Training/test/label',
-    'test': '/raid/datasets/public/EndoVisPose/Training/test/label'}
+dataset['detection_mask'] = {
+    'train': '/raid/datasets/public/EndoVisPose/Training/training/labels_jh/segmentation', 
+    'val': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/segmentation',
+    'test': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/segmentation'}
+dataset['regression_mask'] = {
+    'train': '/raid/datasets/public/EndoVisPose/Training/training/labels_jh/regression', 
+    'val': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression',
+    'test': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression'}
 
 dataset['augmentation'] = dict() 
 dataset['augmentation']['train'] = ['verticalflip', 'horizonflip']
@@ -31,6 +35,8 @@ dataset['num_connections'] = 4
 
 configs['dataset'] = dataset
 
+configs['nms'] = dict()
+configs['nms']['window'] = 200
 
 # Optimization & Scheduler
 optimization = dict()
@@ -68,7 +74,7 @@ configs['model'] = model
 # Metric
 metric = dict()
 metric['metric'] = 'rms' # root mean square
-metric['threshold'] = 20
+metric['threshold'] = 50
 configs['metric'] = metric
 
 

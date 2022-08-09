@@ -133,7 +133,6 @@ class CBS(nn.Module):
         self.cbs = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding, bias=False),
             nn.BatchNorm2d(out_channels),
-            nn.Softmax()
         )
 
     def forward(self, x):

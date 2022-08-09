@@ -15,8 +15,9 @@ from scheduler import get_optimizer
 # from dataload.augmentation import augmentation_dict
 
 
-from tools.metric import save_path, Logger, AverageMeter
+from tools.metric import save_path, Logger, AverageMeter, SegAverageMeter
 from tools.metric import instrument_pose_metric
+from tools.metric import IntersectionAndUnion, Pixel_ACC
 from tools.post_processing import Post_Processing
 
 import warmup_scheduler
@@ -27,11 +28,11 @@ import numpy as np
 import random 
 from tqdm import tqdm 
 
-
+import matplotlib.pyplot as plt
 
 class InstruemntPoseEstimation():
     def __init__(self, configs):
-        configs['results'] = '/raid/results/optimal_surgery/detection_only'
+        # configs['results'] = '/raid/results/optimal_surgery/detection_only'
 
         self.configs = configs
 
@@ -52,7 +53,9 @@ class InstruemntPoseEstimation():
         self.optimizer, self.scheduler = get_optimizer(configs, self.model)
         self.record_set()
         self.loss_function()
-
+        
+        self.num_parts = configs['dataset']['num_parts']
+        self.num_connections = configs['dataset']['num_connections']
         # instrument parsing
         self.post_processing = Post_Processing(configs['dataset']['num_parts'],  configs['dataset']['num_connections'])
 
@@ -82,6 +85,9 @@ class InstruemntPoseEstimation():
     
 
         self.train_losses = AverageMeter()
+        pixel_acc_meter = SegAverageMeter()
+        intersection_meter = SegAverageMeter()
+        union_meter = SegAverageMeter()
 
         N_count = 0          
         
@@ -95,23 +101,51 @@ class InstruemntPoseEstimation():
             self.optimizer.zero_grad()
 
             outputs  = self.model(images)
-            loss = 0
+            loss, pixel_acc, iou = 0, 0, 0
             for i in range(len(outputs)):
                 if self.activation is not None:
                     outputs[i] = self.activation(outputs[i])
+                # outputs[i] = outputs[i].view(images.size(0), -1)
+                # labels[i] = labels[i].view(images.size(0), -1)
                 loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
-
-
+                cnt = 0
+                if i == 0:
+                    scores = outputs[i]
+                    targets = labels[i].clone().cpu().detach().numpy()
+                    for j in range(self.num_connections + self.num_parts):
+                        score = scores[:, j, ...]
+                        pred = np.ones(score.size())
+                        pred = pred * (score.clone().cpu().detach().numpy() > 0.5)
+                        target = targets[:, j, ...]
+             
+                        pixel_acc, pix = Pixel_ACC(pred, target)
+                        intersection, union = IntersectionAndUnion(pred, target, numClass=2)
                 
-            self.train_losses.update(loss.item(), images.size()[0])
+                        pixel_acc_meter.update(pixel_acc, pix)
+                        intersection_meter.update(intersection)
+                        union_meter.update(union)
 
+                        if j == 0 and cnt == 0:
+                            cnt += 1
+                            plt.imshow(pred[0], cmap='gray', vmin=0, vmax=1)
+                   
+                            plt.savefig('/raid/results/pose/train_img/pred_{}.png'.format(str(epoch)))
+                            plt.close()
+                            plt.imshow(target[0]*255, cmap='gray', vmin=0, vmax=255)
+                   
+                            plt.savefig('/raid/results/pose/train_img/gt_{}.png'.format(str(epoch)))
+                            plt.close()
+            self.train_losses.update(loss.item(), images.size()[0])
         
             loss.backward()
             self.optimizer.step()
 
             if (batch_idx) % 10 == 0:      
+                
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, N_count, len(self.train_loader.dataset), 100. * (batch_idx + 1) / len(self.train_loader), self.train_losses.avg))
+                    epoch, N_count, len(self.train_loader.dataset), 100. * (batch_idx + 1) / len(self.train_loader), self.train_losses.avg), end=" ")
+                iou = intersection_meter.sum / (union_meter.sum + 1e-10)
+                print("Segment Eval Pixcel ACC{:.2f}%\t IoU {:.2f}%".format(pixel_acc_meter.average() * 100, iou.mean()))
     
     def validation(self, epoch):
         self.model.eval()
@@ -119,52 +153,85 @@ class InstruemntPoseEstimation():
         self.val_losses = AverageMeter()
         # LeftClasperPoint, RightClasperPoint, HeadPoint, ShaftPoint, EndPoint
         self.leftclasper, self.rightclasper, self.head, self.shaft, self.end = AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter()
+        self.rmse = AverageMeter()
         # self.val_scores = AverageMeter()
 
-        N_count = 0          
+        N_count = 0    
+
+        pixel_acc_meter = SegAverageMeter()
+        intersection_meter = SegAverageMeter()
+        union_meter = SegAverageMeter()
+
+        with torch.no_grad():
+
+            for batch_idx, (images, labels) in enumerate(self.train_loader):
+
+                images = images.cuda()
+                labels = [i.cuda() for i in labels]
+                N_count+= images.size(0)
         
 
-        for batch_idx, (images, labels) in enumerate(self.train_loader):
+                self.optimizer.zero_grad()
 
-            images = images.cuda()
-            labels = [i.cuda() for i in labels]
-            N_count+= images.size(0)
-    
+                outputs  = self.model(images)
+                loss = 0
+                for i in range(len(outputs)):
+                    if self.activation is not None:
+                        heatmap = outputs[i].clone()
+                        outputs[i] = self.activation(outputs[i])
+                    loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
 
-            self.optimizer.zero_grad()
-
-            outputs  = self.model(images)
-            loss = 0
-            for i in range(len(outputs)):
-                if self.activation is not None:
-                    heatmap = outputs[i].clone()
-                    outputs[i] = self.activation(outputs[i])
-                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
-
+                    if i == 0:
+                        scores = outputs[i]
+                        targets = labels[i].clone().cpu().detach().numpy()
+                        for j in range(self.num_connections + self.num_parts):
+                            score = scores[:, j, ...]
+                            pred = np.ones(score.size())
+                            pred = pred * (score.clone().cpu().detach().numpy() > 0.5)
+                            target = targets[:, j, ...]
                 
+                            pixel_acc, pix = Pixel_ACC(pred, target)
+                            intersection, union = IntersectionAndUnion(pred, target, numClass=2)
+                    
+                            pixel_acc_meter.update(pixel_acc, pix)
+                            intersection_meter.update(intersection)
+                            union_meter.update(union)
+                            if j == 0:
+                                plt.imshow(pred[0], cmap='gray', vmin=0, vmax=1)
+                                plt.savefig('/raid/results/pose/test_img/{}.png'.format(str(epoch)))
+                                plt.close()
+
+             
+                    
             self.val_losses.update(loss.item(), images.size()[0])
 
-            parsing = self.post_processing.run(heatmap.detach().cpu().numpy())
-            target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy())
-      
-            step_score = self.metric.forward(parsing, target_parsing)["F1"]
+            parsing = self.post_processing.run(heatmap.detach().cpu().numpy(), self.configs['nms']['window'])
+            target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy(), 10)
+            # print(parsing[0])
+            # print(target_parsing[0])
+            # print("====================")
+            step_score = self.metric.forward(parsing, target_parsing)
             # print(step_score)
-            leftclasper, rightclasper, head, shaft, end = step_score
+            leftclasper, rightclasper, head, shaft, end = step_score["F1"]
+            rmse = np.nanmean(step_score['RMSE'])
             
             self.leftclasper.update(leftclasper, 1)    
             self.rightclasper.update(rightclasper, 1)    
             self.head.update(head, 1)    
             self.shaft.update(shaft, 1)    
-            self.end.update(end, 1)    
+            self.end.update(end, 1)  
+            self.rmse.update(rmse, 1)  
             # self.val_scores.update(step_score, 1)        
         
-            loss.backward()
-            self.optimizer.step()
+            
+            
 
 
-        print('Val Epoch: {} \tLoss: {:.6f}, F1 left: {:.2f}%\t rigth: {:.2f}%\t head: {:.2f}%\t shaft: {:.2f}%\t end: {:.2f}%'.format(
-                epoch, self.val_losses.avg, self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg))#self.val_scores.avg))
-   
+
+        print('Val Epoch: {} \tLoss: {:.6f}, F1 left: {:.2f}%\t rigth: {:.2f}%\t head: {:.2f}%\t shaft: {:.2f}%\t end: {:.2f}%\t RMSE: {:.2f}%'.format(
+                epoch, self.val_losses.avg, self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg, self.rmse.avg), end=" ")#self.val_scores.avg))
+        iou = intersection_meter.sum / (union_meter.sum + 1e-10)
+        print("Segment Eval Pixcel ACC{:.2f}%\t IoU {:.2f}%".format(pixel_acc_meter.average() * 100, iou.mean()))
     def fit(self):
   
 
@@ -176,9 +243,10 @@ class InstruemntPoseEstimation():
             self.train(epoch)
             train_losses = self.train_losses
             self.validation(epoch)
-            test_losses, test_scores = self.val_losses, (self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg)
-            # if self.scheduler is not None:
-            #     self.scheduler.step()
+            test_losses, test_scores = self.val_losses, self.rmse.avg #(self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg)
+
+            if self.scheduler is not None:
+                self.scheduler.step()
             
             # plot average of each epoch loss value
             self.train_logger.log({
@@ -188,7 +256,7 @@ class InstruemntPoseEstimation():
                         })
             if best_acc < np.nanmean(test_scores):
                 best_acc = np.nanmean(test_scores)#test_scores.avg
-                torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'student_best.pth'))
+                torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'best.pth'))
             self.val_logger.log({
                             'epoch': epoch,
                             'loss': test_losses.avg,
@@ -201,7 +269,7 @@ class InstruemntPoseEstimation():
             
          
             self.writer.add_scalar('scores/test',np.nanmean(test_scores),  epoch) #test_scores.avg,
-            torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'student_lastest.pth'))  # save spatial_encoder
+            torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'lastest.pth'))  # save spatial_encoder
        
 
 import argparse
@@ -220,5 +288,5 @@ if __name__ == '__main__':
 
     # cfg.merge_from_dict(args.cfg_options)
     
-    IPE = InstruemntPoseEstimation(cfg)
+    IPE = InstruemntPoseEstimation(cfg.configs)
     IPE.fit()

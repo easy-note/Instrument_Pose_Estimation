@@ -28,20 +28,27 @@ class instrument_pose_metric():
         recall = lambda fn, tp: tp / (tp + fn)
 
         # array order : batch * [[left, right, head, shaft, end], [left, right, head, shaft, end], [left, right, head, shaft, end], ...]
-        # array order : batch *[[left1, left2, left3, ...], [right1, right2, right3, ...], ...]
+        # array order : batch *[[(left1), left2, left3, ...], [right1, right2, right3, ...], ...]
  
         for batch_idx in range(len(preds)):
             pred = preds[batch_idx]
             target = targets[batch_idx]
+            # print("pred", pred)
+            # print("target", target)
             for k in range(self.joint_num):
-      
+            
+                if len(pred) == 0 and len(target) > 0:
+                    false_neg[k] += len(target[k])
+                    continue
+                elif  len(target) == 0:
+                    continue
                 cost_matrix = np.zeros((len(target[k]), len(pred[k])), dtype=np.float32)
 
    
                 for real_i, e_true in enumerate(target[k]):
                     for pred_j, e_pred in enumerate(pred[k]):  # (preds[k]):
-               
-                        if len(e_pred) == 0:
+
+                        if len(e_pred) == 0 or len(e_true) == 0:
                             cost_matrix[real_i, pred_j] = 1e9
                         else:
                             # print(e_pred, e_true)
@@ -50,8 +57,8 @@ class instrument_pose_metric():
             
                 row_idx, col_idx = linear_sum_assignment(cost_matrix)
 
-                if len(pred) < len(target):
-                    false_neg[k] += abs(len(pred) - len(target))
+                if len(pred[k]) < len(target[k]):
+                    false_neg[k] += abs(len(pred[k]) - len(target[k]))
    
                 for r, c in zip(row_idx, col_idx):
                     # check true positive and additional false positive
@@ -64,7 +71,7 @@ class instrument_pose_metric():
                         
                     else:
                         false_pos[k] += 1
-                        
+        # print('tp fp fn',true_pos, false_pos, false_neg, len(preds))      
         f1 = lambda p, r: (2 * p * r) / (p + r)
         p = precision(false_pos, true_pos)
         r = recall(false_neg, true_pos)
