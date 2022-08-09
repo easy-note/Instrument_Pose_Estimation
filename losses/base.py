@@ -21,13 +21,3 @@ class Losses():
     def select_loss(self):
         return [self.set_loss(idx) for idx in range(len(self.method))]
 
-
-
-
-
-
-
-
-
-
-

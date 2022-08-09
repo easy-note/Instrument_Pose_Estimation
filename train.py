@@ -90,7 +90,7 @@ class InstruemntPoseEstimation():
         union_meter = SegAverageMeter()
 
         N_count = 0          
-        
+        cnt = 0
 
         for batch_idx, (images, labels) in enumerate(self.train_loader):
             images = images.cuda()
@@ -103,12 +103,13 @@ class InstruemntPoseEstimation():
             outputs  = self.model(images)
             loss, pixel_acc, iou = 0, 0, 0
             for i in range(len(outputs)):
-                if self.activation is not None:
-                    outputs[i] = self.activation(outputs[i])
+                if self.activation[i] is not None:
+                    outputs[i] = self.activation[i](outputs[i])
                 # outputs[i] = outputs[i].view(images.size(0), -1)
                 # labels[i] = labels[i].view(images.size(0), -1)
+
                 loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
-                cnt = 0
+                
                 if i == 0:
                     scores = outputs[i]
                     targets = labels[i].clone().cpu().detach().numpy()
@@ -131,7 +132,7 @@ class InstruemntPoseEstimation():
                    
                             plt.savefig('/raid/results/pose/train_img/pred_{}.png'.format(str(epoch)))
                             plt.close()
-                            plt.imshow(target[0]*255, cmap='gray', vmin=0, vmax=255)
+                            plt.imshow(target[0], cmap='gray', vmin=0, vmax=1)
                    
                             plt.savefig('/raid/results/pose/train_img/gt_{}.png'.format(str(epoch)))
                             plt.close()
@@ -163,22 +164,20 @@ class InstruemntPoseEstimation():
         union_meter = SegAverageMeter()
 
         with torch.no_grad():
-
+            cnt = 0
             for batch_idx, (images, labels) in enumerate(self.train_loader):
 
                 images = images.cuda()
                 labels = [i.cuda() for i in labels]
                 N_count+= images.size(0)
-        
 
-                self.optimizer.zero_grad()
 
                 outputs  = self.model(images)
                 loss = 0
                 for i in range(len(outputs)):
-                    if self.activation is not None:
+                    if self.activation[i] is not None:
                         heatmap = outputs[i].clone()
-                        outputs[i] = self.activation(outputs[i])
+                        outputs[i] = self.activation[i](outputs[i])
                     loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
 
                     if i == 0:
@@ -196,11 +195,14 @@ class InstruemntPoseEstimation():
                             pixel_acc_meter.update(pixel_acc, pix)
                             intersection_meter.update(intersection)
                             union_meter.update(union)
-                            if j == 0:
+                            if j == 0 and cnt == 0:
                                 plt.imshow(pred[0], cmap='gray', vmin=0, vmax=1)
                                 plt.savefig('/raid/results/pose/test_img/{}.png'.format(str(epoch)))
                                 plt.close()
-
+                                plt.imshow(target[0], cmap='gray', vmin=0, vmax=1)
+                   
+                                plt.savefig('/raid/results/pose/test_img/gt_{}.png'.format(str(epoch)))
+                                plt.close()
              
                     
             self.val_losses.update(loss.item(), images.size()[0])

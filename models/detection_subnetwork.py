@@ -4,7 +4,7 @@ from .unet_parts import *
 import torch
 
 class DetectionSubnetwork(nn.Module):
-    def __init__(self, configs):#n_channels, n_classes, bilinear=False):
+    def __init__(self, configs):# n_channels, n_classes, bilinear=False):
         super(DetectionSubnetwork, self).__init__()
 
         self.n_channels = configs['model']['n_channels']
@@ -126,11 +126,11 @@ class DetectionSubnetwork(nn.Module):
         x9_2_1 = self.up4_b2_dbr(x8)
         x9_2_2 = self.up4_b2_cbr(x9_2_1)
         x9 = torch.cat([x9_1_2, x9_2_2], dim=1)
-        x9 = self.up4_cbr(x9) # torch.Size([10, 64, 512, 512])
+        x9 = self.up4_cbr(x9) # torch.Size([10, 64, 320, 256])
 
-        logits = self.cbs(x9) # torch.Size([10, 9, 512, 512])
+        logits = self.cbs(x9) # torch.Size([10, 9, 320, 256])
         
-        return [logits]
+        return logits
         
 
 

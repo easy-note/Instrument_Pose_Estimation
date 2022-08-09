@@ -35,12 +35,15 @@ def get_losses(configs):
 
 
 def get_activation(configs):
-    if configs['activation'] == 'sigmoid':
-        activation = nn.Sigmoid()
-    elif configs['activation'] == 'softmax':    
-        activation = nn.Softmax()
-    else:
-        activation = None
+
+    activation_list = []
+    for method in configs['activation']:
+        if method == 'sigmoid':
+            activation_list.append(nn.Sigmoid())
+        elif configs['activation'] == 'softmax':    
+            activation_list.append(nn.Softmax())
+        else:
+            activation_list.append(None)
 
 
-    return activation
+    return activation_list

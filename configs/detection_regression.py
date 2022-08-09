@@ -36,7 +36,7 @@ dataset['num_connections'] = 4
 configs['dataset'] = dataset
 
 configs['nms'] = dict()
-configs['nms']['window'] = 200
+configs['nms']['window'] = 20
 
 # Optimization & Scheduler
 optimization = dict()
@@ -57,16 +57,16 @@ configs['scheduler'] = scheduler
 # Loss
 loss = dict()
 
-loss['method'] = ['bce']
-loss['activation'] = 'sigmoid'
+loss['method'] = ['bce', 'mse']
+loss['activation'] = ['sigmoid', None]
 loss['reduction'] = 'mean'
-loss['weight'] = [ None]
-loss['label_smoothing'] = [0.0]
+loss['weight'] = [ None, None]
+loss['label_smoothing'] = [0.0, 0.0]
 configs['loss'] = loss
 
 # Model
 model = dict()
-model['method'] = 'detection_subnetwork'
+model['method'] = 'endovis_network'
 model['n_channels'] = 64
 model['bilinear'] = False
 configs['model'] = model
@@ -79,7 +79,5 @@ configs['metric'] = metric
 
 
 # Defuat
-configs['results'] = '/raid/results/optimal_surgery/detection_only'
+configs['results'] = '/raid/results/optimal_surgery/endovis'
 
-
-configs['results'] = '/raid/results/optimal_surgery/detection_only'

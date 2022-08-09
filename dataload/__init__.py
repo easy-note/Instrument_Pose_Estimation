@@ -46,7 +46,7 @@ def get_dataloaders(configs):
                 drop_last=False,
                 )
 
-    return train_loader, val_loader, test_set
+    return train_loader, val_loader, test_loader
 
 
 def get_augmentation(configs, mode):
