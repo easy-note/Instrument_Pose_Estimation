@@ -45,7 +45,6 @@ class InferenceInstruemntPoseEstimation():
         self.model.load_state_dict(state_dict)
         self.model.to(self.device)
 
-
         # instrument parsing
         self.post_processing = Post_Processing(configs['dataset']['num_parts'],  configs['dataset']['num_connections'])
         self.visualization = Visualization(dest_path = configs.dest_path)
@@ -62,8 +61,6 @@ class InferenceInstruemntPoseEstimation():
                 trans.append(A.VerticalFlip(0.5))
             elif method == 'horizonflip':
                 trans.append(A.HorizontalFlip(0.5))
-
-        
         
         trans.append(A.Normalize(mean=[0.485, 0.456, 0.406],
                                         std=[0.229, 0.224, 0.225]))
@@ -77,10 +74,31 @@ class InferenceInstruemntPoseEstimation():
     def inference(self):
         self.model.eval()
 
+        activation = nn.Sigmoid()
+
         for filename in self.datalist:
+            img = cv2.imread(os.path.join(self.root, filename))
+            cv2.imwrite('gt-img.jpg', img)
+            
+
             image = self.imageopen(os.path.join(self.root, filename))
             image = self.transforms(image=image)['image'].to(self.device).unsqueeze(0)
+            
             outputs = self.model(image)
+            
+            # sigmoid function & threshold (0.13)
+            outputs[0] = activation(outputs[0])
+            outputs[0] = (outputs[0]>0.35).float()
+
+            out = outputs[0][0].detach().cpu().numpy()
+            # out = out.detach().cpu().numpy()
+            out = np.transpose(out, (2,1,0)) # (w,h,c)
+
+            print(out[:,:,0]*255)
+            
+            cv2.imwrite('./predict-img.jpg', out[:,:,0]*255)
+            exit(0)
+
             parsing = self.post_processing.run(outputs[-1].detach().cpu().numpy())
             self.visualization.show(image.squeeze().permute(1,2,0).detach().cpu().numpy(), parsing, filename)
 
@@ -100,6 +118,7 @@ parser.add_argument(
     )
 
 if __name__ == '__main__':
+    import cv2
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.configs)

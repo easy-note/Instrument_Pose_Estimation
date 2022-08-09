@@ -4,23 +4,23 @@ configs = dict()
 dataset = dict()
 dataset['dataset'] = 'endovis'
 dataset['normalization'] = [[1,1,1],[1,1,1]]
-dataset['batch_size'] = 32
+dataset['batch_size'] = 8
 dataset['shuffle'] = True
 dataset['num_workers'] = 6
 dataset['pin_memory'] = True
 
 dataset['images_dir'] = {
-    'train': '/raid/datasets/public/EndoVisPose/Training/training/image', 
-    'val': '/raid/datasets/public/EndoVisPose/Training/test/image',
-    'test': '/raid/datasets/public/EndoVisPose/Training/test/image'}
+    'train': '/raid/dataset/public/general/EndoVisPose/Training/training/image', 
+    'val': '/raid/dataset/public/general/EndoVisPose/Training/test/image',
+    'test': '/raid/dataset/public/general/EndoVisPose/Training/test/image'}
 dataset['seg_masks_dir'] = {
-    'train': '/raid/datasets/public/EndoVisPose/Training/training/labels_jh/segmentation', 
-    'val': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/segmentation',
-    'test': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/segmentation'}
+    'train': '/raid/dataset/public/general/EndoVisPose/Training/training/labels_jh/segmentation', 
+    'val': '/raid/dataset/public/general/EndoVisPose/Training/test/labels_jh/segmentation',
+    'test': '/raid/dataset/public/general/EndoVisPose/Training/test/labels_jh/segmentation'}
 dataset['regress_masks_dir'] = {
-    'train': '/raid/datasets/public/EndoVisPose/Training/training/labels_jh/regression', 
-    'val': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression',
-    'test': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression'}
+    'train': '/raid/dataset/public/general/EndoVisPose/Training/training/labels_jh/regression', 
+    'val': '/raid/dataset/public/general/EndoVisPose/Training/test/labels_jh/regression',
+    'test': '/raid/dataset/public/general/EndoVisPose/Training/test/labels_jh/regression'}
 
 dataset['augmentation'] = dict() 
 dataset['augmentation']['train'] = ['verticalflip', 'horizonflip']
@@ -35,6 +35,8 @@ dataset['num_connections'] = 4
 
 configs['dataset'] = dataset
 
+configs['nms'] = dict()
+configs['nms']['window'] = 200
 
 # Optimization & Scheduler
 optimization = dict()
@@ -42,7 +44,7 @@ optimization['optim'] = 'sgd'
 optimization['momentum'] = 0.98
 optimization['weight_decay'] = 1e-4
 optimization['init_lr'] = 0.001
-optimization['epochs'] = 30
+optimization['epochs'] = 100
 
 scheduler = dict()
 scheduler['scheduler'] = 'step_lr'
@@ -78,5 +80,6 @@ configs['metric'] = metric
 
 
 # Defuat
-configs['results'] = '/raid/results/optimal_surgery/detection_only'
+configs['results'] = '/raid/users/cv_ljh_0/instrument_pose/models'
+
 

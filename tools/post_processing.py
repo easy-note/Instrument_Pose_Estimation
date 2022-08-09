@@ -15,16 +15,17 @@ class Post_Processing():
         # joint1, joint2, joint1-joint2 pair id
         self.joint_pair_list = [(0, 2, 5), (1, 2, 6), (2, 3, 7), (3, 4, 8)]
 
-    def run(self, bacth_iamges):
+    def run(self, bacth_iamges, window=100):
         result_batches = []
         for heatmap in bacth_iamges:
             heatmap = np.transpose(heatmap, (1,2,0))
-            candidates = self.bipartite_graph_matching(heatmap)
+            candidates = self.bipartite_graph_matching(heatmap, window)
 
             parsed = self.parsing(candidates)
 
             self.parse_failed = False
-        
+
+            '''
             if len(parsed) == 2:
                 inst1, inst2 = parsed
                 final_prediction = list(zip(inst1, inst2))
@@ -42,13 +43,14 @@ class Post_Processing():
                     else:
                         final_prediction[i] = []
             # inst = len(parsed)
-            # result_batches.append(list(zip(*parsed)))
-            result_batches.append(final_prediction)
+            '''
+            result_batches.append(list(zip(*parsed)))
+            # result_batches.append(final_prediction)
         
         return result_batches
 
-    def pred_init(self, heatmap):
-        _, heatmap[:, :, :self.num_parts] = nms(heatmap[:, :, :self.num_parts], self.num_parts)
+    def pred_init(self, heatmap, window):
+        _, heatmap[:, :, :self.num_parts] = nms(heatmap[:, :, :self.num_parts], self.num_parts, window)
         loc_pred = [[] for i in range(self.num_parts)]  
         candidates_num = 5
         for i in range(self.num_parts):
@@ -66,9 +68,9 @@ class Post_Processing():
 
     
 
-    def bipartite_graph_matching(self, heatmap):
+    def bipartite_graph_matching(self, heatmap, window):
         
-        loc_pred = self.pred_init(heatmap)
+        loc_pred = self.pred_init(heatmap, window)
 
         candidates = [[] for i in range(self.num_connections)]  
         

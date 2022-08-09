@@ -31,9 +31,12 @@ from tqdm import tqdm
 
 class InstruemntPoseEstimation():
     def __init__(self, configs):
-        configs['results'] = '/raid/results/optimal_surgery/detection_only'
+        configs['results'] = '/raid/users/cv_ljh_0/instrument_pose/models'
 
         self.configs = configs
+
+        # print(self.configs['configs']['nms']['windows'])
+        # exit(0)
 
         # Detect devices
         use_cuda = torch.cuda.is_available()                   # check if GPU exists
@@ -82,13 +85,42 @@ class InstruemntPoseEstimation():
     
         self.train_losses = AverageMeter()
 
-        N_count = 0              
+        N_count = 0   
+
+        import cv2           
 
         for batch_idx, (images, labels) in enumerate(self.train_loader):
+            
+            '''
+            # image & GT 비교
+            print(type(images))
+            print(images.shape)
+            print(type(labels))
+            print(labels[0].shape)
+
+            img = images[0,:,:,:].detach().cpu().numpy()
+            la = labels[0][0,:,:,:].detach().cpu().numpy()
+
+            img = np.transpose(img, (2,1,0))
+            la = np.transpose(la, (2,1,0))
+
+            cv2.imwrite("test-1.png", img[:,:,0]+la[:,:,0]*255)
+            cv2.imwrite("test-2.png", img[:,:,0]+la[:,:,1]*255)
+            cv2.imwrite("test-3.png", img[:,:,0]+la[:,:,2]*255)
+            cv2.imwrite("test-4.png", img[:,:,0]+la[:,:,3]*255)
+            cv2.imwrite("test-5.png", img[:,:,0]+la[:,:,4]*255)
+            cv2.imwrite("test-6.png", img[:,:,0]+la[:,:,5]*255)
+            cv2.imwrite("test-7.png", img[:,:,0]+la[:,:,6]*255)
+            cv2.imwrite("test-8.png", img[:,:,0]+la[:,:,7]*255)
+            cv2.imwrite("test-9.png", img[:,:,0]+la[:,:,8]*255)
+            
+            exit(0)
+            '''
+
             images = images.cuda()
             labels = [i.cuda() for i in labels]
-            N_count+= images.size(0)
-    
+            N_count += images.size(0)
+
             self.optimizer.zero_grad()
 
             outputs = self.model(images) # [[torch.Size([32, 9, 320, 256])], [torch.Size([32, 9, 320, 256])]]
@@ -102,16 +134,16 @@ class InstruemntPoseEstimation():
 
                 # print(loss)
 
-
             self.train_losses.update(loss.item(), images.size()[0])
-
         
             loss.backward()
             self.optimizer.step()
 
             if (batch_idx) % 10 == 0:      
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, N_count, len(self.train_loader.dataset), 100. * (batch_idx + 1) / len(self.train_loader), self.train_losses.avg))
+                    epoch, N_count, len(self.train_loader.dataset), 100. * (batch_idx + 1) / len(self.train_loader), \
+                    self.train_losses.avg))
+    
     
     def validation(self, epoch):
         self.model.eval()
@@ -123,51 +155,52 @@ class InstruemntPoseEstimation():
 
         N_count = 0          
         
+        with torch.no_grad():
+            for batch_idx, (images, labels) in enumerate(self.valid_loader): # self.train_loader -> self.valid_loader
 
-        for batch_idx, (images, labels) in enumerate(self.valid_loader): # self.train_loader -> self.valid_loader
-
-            images = images.cuda()
-            labels = [i.cuda() for i in labels]
-            N_count+= images.size(0)
-    
-            self.optimizer.zero_grad()
-
-            outputs  = self.model(images)
-            loss = 0
-            for i in range(len(outputs)): # len(outputs) = 2
-                if self.activation[i] is not None:
-                    outputs[i] = self.activation[i](outputs[i])
-                
-                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
-            
-            self.val_losses.update(loss.item(), images.size()[0])
-            
-            heatmap = outputs[-1].clone() # regression
-                    
-            parsing = self.post_processing.run(heatmap.detach().cpu().numpy()) # prediction
-            target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy()) # regression gt : 정답이 json 형태 -> list 형태로 변환해야 함. 
-
-            step_score = self.metric.forward(parsing, target_parsing)["F1"]
-            # print(step_score)
-            leftclasper, rightclasper, head, shaft, end = step_score
-            
-            self.leftclasper.update(leftclasper, 1)    
-            self.rightclasper.update(rightclasper, 1)    
-            self.head.update(head, 1)    
-            self.shaft.update(shaft, 1)    
-            self.end.update(end, 1)    
-            # self.val_scores.update(step_score, 1)        
+                images = images.cuda()
+                labels = [i.cuda() for i in labels]
+                N_count+= images.size(0)
         
-            loss.backward()
-            self.optimizer.step()
+                # self.optimizer.zero_grad()
+                
+                outputs  = self.model(images)
+                loss = 0
+                for i in range(len(outputs)): # len(outputs) = 2
+                    if self.activation[i] is not None:
+                        heatmap = outputs[-1].clone() # regression
+                        outputs[i] = self.activation[i](outputs[i])
+                    
+                    loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
+                
+                self.val_losses.update(loss.item(), images.size()[0])   
+                        
+                # parsing = self.post_processing.run(heatmap.detach().cpu().numpy()) # prediction
+                parsing = self.post_processing.run(heatmap.detach().cpu().numpy(), self.configs['configs']['nms']['window'])
+                target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy(), 200) # regression gt : 정답이 json 형태 -> list 형태로 변환해야 함. 
+
+                step_score = self.metric.forward(parsing, target_parsing)["F1"]
+                # print(step_score)
+                leftclasper, rightclasper, head, shaft, end = step_score
+                
+                self.leftclasper.update(leftclasper, 1)    
+                self.rightclasper.update(rightclasper, 1)    
+                self.head.update(head, 1)    
+                self.shaft.update(shaft, 1)    
+                self.end.update(end, 1)    
+                
+                # self.val_scores.update(step_score, 1)        
+                # loss.requires_grad_(True)
+                # loss.backward()
+                # self.optimizer.step()
 
 
         print('Val Epoch: {} \tLoss: {:.6f}, F1 left: {:.2f}%\t rigth: {:.2f}%\t head: {:.2f}%\t shaft: {:.2f}%\t end: {:.2f}%'.format(
                 epoch, self.val_losses.avg, self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg))#self.val_scores.avg))
-   
+        
+
     def fit(self):
   
-
         self.model.to(self.device)
         # start training
         best_acc = 0
@@ -188,7 +221,7 @@ class InstruemntPoseEstimation():
                         })
             if best_acc < np.nanmean(test_scores):
                 best_acc = np.nanmean(test_scores)#test_scores.avg
-                torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'student_best.pth'))
+                torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'model_best.pth'))
             self.val_logger.log({
                             'epoch': epoch,
                             'loss': test_losses.avg,
@@ -201,7 +234,8 @@ class InstruemntPoseEstimation():
             
          
             self.writer.add_scalar('scores/test',np.nanmean(test_scores),  epoch) #test_scores.avg,
-            torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'student_lastest.pth'))  # save spatial_encoder
+            print(self.save_model_path)
+            torch.save({'state_dict': self.model.state_dict()}, os.path.join(self.save_model_path, 'model_lastest.pth'))  # save spatial_encoder
        
 
 import argparse
@@ -214,6 +248,9 @@ parser.add_argument(
     )
 
 if __name__ == '__main__':
+    import os
+    import cv2
+
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.configs)

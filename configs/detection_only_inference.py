@@ -1,6 +1,6 @@
 configs = dict()
 # Defuat
-dest_path = '/raid/results/optimal_surgery/detection_only/endovis/detection_subnetwork/202208010841/'
+dest_path = '/raid/users/cv_ljh_0/instrument_pose/models/endovis/endovis_network/202208090658/'
 
 
 # Dataset
@@ -13,8 +13,9 @@ dataset['num_workers'] = 6
 dataset['pin_memory'] = True
 
 import os 
-dataset['images'] = None #os.listdir('/raid/datasets/public/EndoVisPose/Training/test/image')
-dataset['root'] = '/raid/datasets/public/EndoVisPose/Training/test/'
+# dataset['images'] = None #os.listdir('/raid/datasets/public/EndoVisPose/Training/test/image')
+dataset['images'] = os.listdir('/raid/dataset/public/general/EndoVisPose/Training/test/image')
+dataset['root'] = '/raid/dataset/public/general/EndoVisPose/Training/test/image'
 
 dataset['augmentation'] = dict() 
 dataset['augmentation']['train'] = ['verticalflip', 'horizonflip']
@@ -32,8 +33,8 @@ configs['dataset'] = dataset
 
 # Model
 model = dict()
-model['method'] = 'detection_subnetwork'
+model['method'] = 'endovis_network'
 model['n_channels'] = 64
 model['bilinear'] = False
-model['checkpoint'] = '/raid/results/optimal_surgery/detection_only/endovis/detection_subnetwork/202208010841/models/student_lastest.pth'
+model['checkpoint'] = '/raid/users/cv_ljh_0/instrument_pose/models/endovis/endovis_network/202208090658/models/model_lastest.pth'
 configs['model'] = model

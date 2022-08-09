@@ -19,7 +19,7 @@ def get_dataloaders(configs):
     train_transform = A.Compose(get_augmentation(configs, 'train'))
     val_transform = A.Compose(get_augmentation(configs, 'val'))
     test_transform = A.Compose(get_augmentation(configs, 'test'))
-
+    
     if configs['dataset'] == 'endovis':
         train_set = EndovisDataset(configs, transforms = train_transform)
         valid_set = EndovisDataset(configs, transforms = val_transform)
