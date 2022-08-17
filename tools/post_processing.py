@@ -14,11 +14,15 @@ class Post_Processing():
         # joint1, joint2, joint1-joint2 pair id
         self.joint_pair_list = [(0, 2, 5), (1, 2, 6), (2, 3, 7), (3, 4, 8)]
  
-    def run(self, bacth_iamges , window=100):
+    def run(self, bacth_iamges , window=20):
         result_batches = []
+        T = 20
         for heatmap in bacth_iamges:
             heatmap = np.transpose(heatmap, (1,2,0)) # CHW - > HWC
+            heatmap[:, :, :5] = cv2.GaussianBlur(heatmap[:, :, :5], (20+1, 20+1), 0)
+            
             candidates = self.bipartite_graph_matching(heatmap, window)
+    
             parsed = self.parsing(candidates)
 
             self.parse_failed = False
@@ -41,15 +45,19 @@ class Post_Processing():
             #             final_prediction[i] = []
             # inst = len(parsed)
             result_batches.append(list(zip(*parsed)))
+            # print(list(zip(*parsed)))
             # result_batches.append(final_prediction)
         return result_batches
 
     def pred_init(self, heatmap, window):
         _, heatmap[:, :, :self.num_parts] = nms(heatmap[:, :, :self.num_parts], self.num_parts, window)
+        mask = cv2.addWeighted(heatmap[:, :, 5:], 1, cv2.GaussianBlur(heatmap[:, :, 5:], (20+1, 20+1), 0), -1, 0)
+        heatmap[:, :, 5:] += mask
         loc_pred = [[] for i in range(self.num_parts)]  
         candidates_num = 5
         for i in range(self.num_parts):
             image = heatmap[:, :, i].copy()
+            # print(i, np.sum(image))
             for j in range(candidates_num):
                 _, max_val , _, max_loc = cv2.minMaxLoc(image)
                 if max_loc[0] == max_loc[1] == 0:
@@ -58,7 +66,7 @@ class Post_Processing():
                 y, x = max_loc
 
                 image[x-5:x+5, y-5:y+5] = 0.
-   
+       
         return  loc_pred
 
     
@@ -87,7 +95,7 @@ class Post_Processing():
 
             for r, c in zip(row_idx, col_idx):
                 candidates[idx].append((loc_pred[joint_idx1][r], loc_pred[joint_idx2][c]))
-  
+
         return candidates
 
     def parsing(self, candidates):
@@ -108,18 +116,21 @@ class Post_Processing():
                 if head[0] == head_next[0] and head[1] == head_next[1]:
            
                     parsed[i].insert(0, right)
+                    break
 
             for next_pairs in candidates[-4]:
                 left, head_next = next_pairs
                 if head[0] == head_next[0] and head[1] == head_next[1]:
                     parsed[i].insert(0, left)
-  
+                    break
+        # print(parsed)
         # joint 가 missing 된 부분 ()으로 채우기 
         for i, pose in enumerate(parsed):
             if len(pose) < self.num_parts:
                 for _ in range(self.num_parts - len(pose)):
                     parsed[i].insert(0, ())
-
+        # print()
+        # print(parsed)
         return parsed
 
         

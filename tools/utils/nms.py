@@ -4,7 +4,7 @@ from scipy.ndimage.filters import maximum_filter
 
 def nms(heatmap, num_parts, window_size):
 
-    NMS_THRESH = [.2]*num_parts #[.2, .1, .1, .1, .1] # hyper-parameter 
+    NMS_THRESH = [0.1] * 5#[.05, .05, .05, .05, .05] # hyper-parameter 
     # 각 joint 마다 confidence 의 threshold 
 
     for i in range(num_parts):

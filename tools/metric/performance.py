@@ -80,8 +80,8 @@ class instrument_pose_metric():
         metric = {
             "TP/FN/FP": [true_pos.tolist(), false_neg.tolist(), false_pos.tolist()],
             'RMSE': np.sqrt(rmse / true_pos),
-            "Precision": p,
-            "Recall": r,
+            "Precision": p*100,
+            "Recall": r*100,
             "F1": f1(p, r),
             "MEA": mae / counter
         }

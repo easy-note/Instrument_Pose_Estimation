@@ -1,7 +1,7 @@
 import numpy as np
 def Pixel_ACC(preds, label):
     valid = (label >= 0)
-    acc_sum = (valid * (preds == label)).sum()
+    acc_sum = (preds == label).sum()
     valid_sum = valid.sum()
     acc = float(acc_sum) / (valid_sum + 1e-10)
     return acc, valid_sum

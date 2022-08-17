@@ -13,6 +13,8 @@ class Visualization():
     def __init__(self, mode='test', dest_path=None):
 
         self.dest_path = dest_path
+        if not os.path.exists(dest_path):
+            os.makedirs(dest_path, exist_ok=True)
         self.regression_list = '/raid/datasets/public/EndoVisPose/Training/training/labels_jh/regression'
         # LeftClasperPoint, RightClasperPoint, HeadPoint, ShaftPoint, EndPoint (0,1,2,3,4)
         # joint1, joint2, joint1-joint2 pair id
@@ -82,16 +84,21 @@ class Visualization():
         plt.axis('off')
 
         for tool in label:
-            print(tool)
+            # print(tool)
             if len(tool) == -5:
                 continue
             for multiple_tools_idx in range(len(tool)):
                 for point_idx in range(len(tool[multiple_tools_idx])):
-                    x, y = tool[multiple_tools_idx][point_idx] 
+                    point = tool[multiple_tools_idx][point_idx] 
+                    if len(point) == 0:
+                        continue
+                    x, y = point
+             
                     if y == -1 or x == -1:
                         continue
                     plt.plot(x, y, color=self.joint_color[multiple_tools_idx], marker='o', markersize=5)
-        plt.savefig(os.path.join(self.dest_path, title + '.png'))
+        # print(self.dest_path, title)
+        plt.savefig(os.path.join(self.dest_path, title.split('.')[0] + '.png'))
         plt.close()
 
     

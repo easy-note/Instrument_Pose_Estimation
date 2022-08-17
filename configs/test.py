@@ -1,13 +1,19 @@
 configs = dict()
+# Defuat
+configs['dest_path'] = '//raid/results/optimal_surgery/endovis/\
+endovis/endovis_network/202208160728'
 
 # Dataset
 dataset = dict()
 dataset['dataset'] = 'endovis'
-dataset['normalization'] = [[1,1,1],[1,1,1]]
-dataset['batch_size'] = 32
+dataset['normalization'] = {'mean': [0.5, 0.5,0.5], 'std' : [0.5, 0.5,0.5]}
+#[0.3315324287939336, 0.30612040989419975, 0.42873558758384006]
+#[0.16884704188593896, 0.15812564825433872, 0.18358451252795385]
+dataset['batch_size'] = 5
 dataset['shuffle'] = True
 dataset['num_workers'] = 6
 dataset['pin_memory'] = True
+
 
 dataset['images_dir'] = {
     'train': '/raid/datasets/public/EndoVisPose/Training/training/image', 
@@ -22,12 +28,13 @@ dataset['regression_mask'] = {
     'val': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression',
     'test': '/raid/datasets/public/EndoVisPose/Training/test/labels_jh/regression'}
 
+
 dataset['augmentation'] = dict() 
 dataset['augmentation']['train'] = ['verticalflip', 'horizonflip']
 dataset['augmentation']['val'] = []
 dataset['augmentation']['test'] = []
 
-dataset['img_size'] = (256,320)
+dataset['img_size'] = (320,256)
 
 dataset['n_class'] = 9
 dataset['num_parts'] = 5
@@ -35,33 +42,17 @@ dataset['num_connections'] = 4
 
 configs['dataset'] = dataset
 
+
 configs['nms'] = dict()
-configs['nms']['window'] = 20
-
-# Optimization & Scheduler
-optimization = dict()
-optimization['optim'] = 'sgd'
-optimization['momentum'] = 0.98
-optimization['weight_decay'] = 1e-4
-optimization['init_lr'] = 0.001
-optimization['epochs'] = 30
-
-scheduler = dict()
-scheduler['scheduler'] = 'step_lr'
-scheduler['lr_decay_epochs'] = 10
-scheduler['gamma'] = 0.5
-
-configs['optimization'] = optimization
-configs['scheduler'] = scheduler
-
+configs['nms']['window'] = 100
 # Loss
 loss = dict()
 
-loss['method'] = ['bce', 'mse']
-loss['activation'] = ['sigmoid', None]
+loss['method'] = ['bce']
+loss['activation'] = 'sigmoid'
 loss['reduction'] = 'mean'
-loss['weight'] = [ None, None]
-loss['label_smoothing'] = [0.0, 0.0]
+loss['weight'] = [ None]
+loss['label_smoothing'] = [0.0]
 configs['loss'] = loss
 
 # Model
@@ -69,15 +60,16 @@ model = dict()
 model['method'] = 'endovis_network'
 model['n_channels'] = 64
 model['bilinear'] = False
+model['checkpoint'] = configs['dest_path'] + '/models/lastest.pth'
 configs['model'] = model
 
 # Metric
 metric = dict()
 metric['metric'] = 'rms' # root mean square
-metric['threshold'] = 50
+metric['threshold'] = 20
 configs['metric'] = metric
 
 
 # Defuat
-configs['results'] = '/raid/results/optimal_surgery/endovis'
+
 

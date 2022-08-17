@@ -62,10 +62,17 @@ class DetectionSubnetwork(nn.Module):
         self.up4_b2_dbr = DBR(in_channels=128, out_channels=32, kernel_size=2, stride=2)
         self.up4_b1_cbr = CBR(in_channels=32, out_channels=32, kernel_size=3)
         self.up4_b2_cbr = CBR(in_channels=32, out_channels=32, kernel_size=3)
-        self.up4_cbr = CBR(in_channels=64, out_channels=64, kernel_size=1, padding=0)
+        # self.up4_cbr = CBR(in_channels=64, out_channels=64, kernel_size=1, padding=0)
 
-        self.cbs = CBS(in_channels=64, out_channels=self.n_classes, kernel_size=1, padding=0)
+        self.b1_cbs = CBS(in_channels=32, out_channels=configs['dataset']['num_parts'], kernel_size=1, padding=0)
+        self.b2_cbs = CBS(in_channels=32, out_channels=configs['dataset']['num_connections'], kernel_size=1, padding=0)
 
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         ## down sampling
@@ -123,14 +130,16 @@ class DetectionSubnetwork(nn.Module):
 
         x9_1_1 = self.up4_b1_dbr(x8)
         x9_1_2 = self.up4_b1_cbr(x9_1_1)
+        x9_1_3 = self.b1_cbs(x9_1_2)
         x9_2_1 = self.up4_b2_dbr(x8)
         x9_2_2 = self.up4_b2_cbr(x9_2_1)
-        x9 = torch.cat([x9_1_2, x9_2_2], dim=1)
-        x9 = self.up4_cbr(x9) # torch.Size([10, 64, 320, 256])
+        x9_2_3 = self.b2_cbs(x9_2_2)
+        # x9 = torch.cat([x9_1_2, x9_2_2], dim=1)
+        # x9 = self.up4_cbr(x9) # torch.Size([10, 64, 320, 256])
 
-        logits = self.cbs(x9) # torch.Size([10, 9, 320, 256])
+        # logits = self.cbs(x9) # torch.Size([10, 9, 320, 256])
         
-        return logits
+        return torch.cat([x9_1_3, x9_2_3], dim=1)
         
 
 

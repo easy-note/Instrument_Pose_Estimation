@@ -21,15 +21,15 @@ def get_dataloaders(configs):
     test_transform = A.Compose(get_augmentation(configs, 'test'), p=1)
 
     if configs['dataset'] == 'endovis':
-        train_set = EndovisDataset(configs, transforms = train_transform)
-        valid_set = EndovisDataset(configs, transforms = val_transform)
-        test_set = EndovisDataset(configs, transforms = test_transform)
+        train_set = EndovisDataset(configs, state='train', transforms = train_transform)
+        valid_set = EndovisDataset(configs, state='val', transforms = val_transform)
+        test_set = EndovisDataset(configs, state='test', transforms = test_transform)
     train_loader = DataLoader(
                 train_set,
                 batch_size=configs['batch_size'],
                 num_workers=configs['num_workers'],
                 shuffle=True,
-                drop_last=True,
+                drop_last=False,
                 )
 
     val_loader = DataLoader(
@@ -54,15 +54,27 @@ def get_augmentation(configs, mode):
     width, height = configs['img_size']
     trans = [A.Resize(width=width, height=height )]
 
-    for method in configs['augmentation'][mode]:
-        if method == 'verticalflip':
-            trans.append(A.VerticalFlip(0.5))
-        elif method == 'horizonflip':
-            trans.append(A.HorizontalFlip(0.5))
+    # for method in configs['augmentation'][mode]:
+    #     if method == 'verticalflip':
+    #         trans.append(A.VerticalFlip(0.7))
+    #     elif method == 'horizonflip':
+    #         trans.append(A.HorizontalFlip(0.7))
+    if mode == 'train':
+        trans.append(A.RandomResizedCrop(height=height, width=width, scale=(0.7, 0.8)))
+        trans.append(A.ShiftScaleRotate(scale_limit=[-0.3, 0.35], rotate_limit=[-45,45]))
+
 
     
+        trans.append(A.OneOf([
+            A.Blur(),
+            A.RandomBrightnessContrast(p=0.2)
+        ]))
+        trans.append(A.OneOf([
+            A.VerticalFlip(p=1)
+            A.HorizontalFlip(p=1)
+        ]))
     
-    trans.append(A.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225]))
+    mean, std = configs['normalization']['mean'], configs['normalization']['std']
+    trans.append(A.Normalize(mean=mean, std=std))
     trans.append(AP.transforms.ToTensorV2())
     return trans

@@ -18,9 +18,14 @@ class RegressionSubnetwork(nn.Module):
         self.cbr4 = CBR(in_channels=256, out_channels=256, kernel_size=3)
         self.cbr5 = CBR(in_channels=256, out_channels=256, kernel_size=1, padding=0)
 
-        self.cb = CBR(in_channels=256, out_channels=self.n_classes, kernel_size=1, padding=0)
+        self.cb = CB(in_channels=256, out_channels=self.n_classes, kernel_size=1, padding=0)
 
-
+        for m in self.modules():    
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu') #xavier_uniform_
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
     def forward(self, x):
 
         x1 = self.cbr1(x)
@@ -33,6 +38,7 @@ class RegressionSubnetwork(nn.Module):
 
         return logits
 
+    
 
 
 def base_models(configs, **kwargs):

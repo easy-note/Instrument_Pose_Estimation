@@ -18,20 +18,38 @@ from scheduler import get_optimizer
 from tools.metric import save_path, Logger, AverageMeter
 from tools.metric import instrument_pose_metric
 from tools.post_processing import Post_Processing
+from tools.visualization import Visualization
 
 import warmup_scheduler
 import warnings
 
 import os
+import cv2
 import numpy as np
 import random 
 from tqdm import tqdm 
+import math
 
+class UnNormalize(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
 
+    def __call__(self, tensor):
+        """
+        Args:
+            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+        Returns:
+            Tensor: Normalized image.
+        """
+        for t, m, s in zip(tensor, self.mean, self.std):
+            t.mul_(s).add_(m)
+            # The normalize code -> t.sub_(m).div_(s)
+        return tensor
 
 class TestInstruemntPoseEstimation():
     def __init__(self, configs):
-        self.configs = configs
+        self.configs = configs.configs
 
         # Detect devices
         use_cuda = torch.cuda.is_available()                   # check if GPU exists
@@ -45,94 +63,111 @@ class TestInstruemntPoseEstimation():
         state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
         self.model.load_state_dict(state_dict)
         self.model.to(self.device)
-
+        self.visualization = Visualization(dest_path = self.configs['dest_path'] + '/test_vis')
+        self.visualization_gt = Visualization(dest_path = self.configs['dest_path'] + '/test_vis_gt')
         # set optimiation / scheduler
         self.record_set()
         self.loss_function()
 
+        self.image_list = sorted(os.listdir(self.configs['dataset']['images_dir']['test']))
         # instrument parsing
-        self.post_processing = Post_Processing(configs['dataset']['num_parts'],  configs['dataset']['num_connections'])
-
-        
+        self.post_processing = Post_Processing(self.configs['dataset']['num_parts'],  configs['dataset']['num_connections'])
         
     def record_set(self):
-        # record training process
-        self.savePath, self.date_method, self.save_model_path  = save_path(self.configs)
+    
 
-        self.test_logger = Logger(os.path.join(self.savePath, self.date_method, 'val.log'),
-                                        ['loss', 'metric'])
+        self.test_logger = Logger(os.path.join(self.configs['dest_path'], 'test_vis', 'perform.log'),
+                                        ['left', 'right', 'head', 'shaft', 'end', 'rmse'])
 
         
+        self.mean = self.configs['dataset']['normalization']['mean']
+        self.std = self.configs['dataset']['normalization']['std']
+        self.unnorm = UnNormalize(self.mean, self.std)
 
     def loss_function(self):
-
         self.losses = get_losses(self.configs['loss'])
         self.activation = get_activation(self.configs['loss'])
         self.metric = instrument_pose_metric(self.configs)
 
 
-    def testing(self, epoch):
+    
+    def testing(self):
         self.model.eval()
 
-        self.val_losses = AverageMeter()
+        losses_meter = AverageMeter()
         # LeftClasperPoint, RightClasperPoint, HeadPoint, ShaftPoint, EndPoint
-        self.leftclasper, self.rightclasper, self.head, self.shaft, self.end = AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter()
-        # self.val_scores = AverageMeter()
-
-        N_count = 0          
+        precision_tools = [AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter()]
+        recall_tools = [AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter()]
+        rmse_tools = [AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter(),AverageMeter()]
+        totals = [AverageMeter(),AverageMeter(),AverageMeter()]
         
+        iteration = 0    
 
-        for batch_idx, (images, labels) in enumerate(self.train_loader):
 
-            images = images.cuda()
-            labels = [i.cuda() for i in labels]
-            N_count+= images.size(0)
-    
 
-            self.optimizer.zero_grad()
+        with torch.no_grad():
 
-            outputs  = self.model(images)
-            loss = 0
-            for i in range(len(outputs)):
-                if self.activation is not None:
-                    outputs[i] = self.activation(outputs[i])
-                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
+            for batch_idx, (images, labels) in enumerate(self.test_loader):
 
+                images = images.cuda()
+                labels = [i.cuda() for i in labels]
+
+
+
+
+                outputs  = self.model(images)[-1].detach().cpu().numpy()
+          
+     
+                parsing = self.post_processing.run(outputs, self.configs['nms']['window'])
+                target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy(), 5)
+
+                n = images.size(0)
+
+                # images = self.unnorm(images).permute(0, 2,3,1).detach().cpu().numpy()
+
+                for idx in range(n):
+                    image = cv2.cvtColor(self.unnorm(images[idx]).permute(1, 2,0).detach().cpu().numpy(), cv2.COLOR_BGR2RGB)
+                    self.visualization.show(image, [parsing[idx]], self.image_list[iteration])
+
+                    self.visualization_gt.show(image, [target_parsing[idx]], self.image_list[iteration])
+                    iteration += 1
+
+                step_score = self.metric.forward(parsing, target_parsing)
+                # eftclasper rightclasper head shaft end
+                precisions = step_score["Precision"]
+                recalls = step_score["Recall"]
+                rmses = step_score["RMSE"]
+
+                totals[0].update(np.nanmean(precisions))
+                totals[1].update(np.nanmean(recalls))
+                totals[2].update(np.nanmean(rmses))
+                for idx in range(len(precisions)):
+                    precision = precisions[idx]
+                    recall = recalls[idx]
+                    rmse = rmses[idx]
+                    if not math.isnan(precision):
+                        precision_tools[idx].update(precision, 1)    
+                    if not math.isnan(recall):
+                        recall_tools[idx].update(recall, 1)    
+                    if not math.isnan(rmse):
+                        rmse_tools[idx].update(rmse, 1)    
                 
-            self.val_losses.update(loss.item(), images.size()[0])
 
-            parsing = self.post_processing.run(outputs[-1].detach().cpu().numpy())
-            target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy())
-      
-            step_score = self.metric.forward(parsing, target_parsing)["F1"]
-        
-            leftclasper, rightclasper, head, shaft, end = step_score
-            
-            self.leftclasper.update(leftclasper, 1)    
-            self.rightclasper.update(rightclasper, 1)    
-            self.head.update(head, 1)    
-            self.shaft.update(shaft, 1)    
-            self.end.update(end, 1)    
-            # self.val_scores.update(step_score, 1)        
-        
-            loss.backward()
-            self.optimizer.step()
-
-
-        print('Val Epoch: {} \tLoss: {:.6f}, F1 left: {:.2f}%\t rigth: {:.2f}%\t head: {:.2f}%\t shaft: {:.2f}%\t end: {:.2f}%'.format(
-                epoch, self.val_losses.avg, self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg))#self.val_scores.avg))
-   
+        print("LeftClasper", "RightClasper", "Head", "Shaft", "End", "Total")
+        for i in range(self.configs['dataset']['num_parts']):
+            print("{:.2f} / {:.2f} / {:.2f}".format(precision_tools[i].avg, recall_tools[i].avg,  rmse_tools[i].avg), end=' | ')
+        print("{:.2f} / {:.2f} / {:.2f}".format(totals[0].avg, totals[1].avg, totals[2].avg), )
     def run(self):
   
         best_acc = 0
         
         
-        self.testing(epoch)
-        test_losses, test_scores = self.val_losses, (self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg)
-        self.test_logger.log({
-                            'loss': test_losses.avg,
-                            'metric': np.nanmean(test_scores), 
-                        })
+        self.testing()
+        # test_scores =  (self.leftclasper.avg, self.rightclasper.avg, self.head.avg, self.shaft.avg, self.end.avg)
+        # self.test_logger.log({
+                 
+        #                     'metric': np.nanmean(test_scores), 
+        #                 })
        
 
 import argparse

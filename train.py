@@ -23,13 +23,29 @@ from tools.post_processing import Post_Processing
 import warmup_scheduler
 import warnings
 
+import cv2
 import os
 import numpy as np
 import random 
 from tqdm import tqdm 
 
 import matplotlib.pyplot as plt
+class UnNormalize(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
 
+    def __call__(self, tensor):
+        """
+        Args:
+            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+        Returns:
+            Tensor: Normalized image.
+        """
+        for t, m, s in zip(tensor, self.mean, self.std):
+            t.mul_(s).add_(m)
+            # The normalize code -> t.sub_(m).div_(s)
+        return tensor
 class InstruemntPoseEstimation():
     def __init__(self, configs):
         # configs['results'] = '/raid/results/optimal_surgery/detection_only'
@@ -60,7 +76,7 @@ class InstruemntPoseEstimation():
         self.post_processing = Post_Processing(configs['dataset']['num_parts'],  configs['dataset']['num_connections'])
 
         
-        
+        self.sigmoid = nn.Sigmoid()
     def record_set(self):
         # record training process
         self.savePath, self.date_method, self.save_model_path  = save_path(self.configs)
@@ -71,6 +87,9 @@ class InstruemntPoseEstimation():
 
         self.writer = SummaryWriter(os.path.join(self.savePath, self.date_method,'logfile'))
         
+        self.output_image_path = os.path.join(self.savePath,self.date_method, 'poseImage')
+        if not os.path.exists(self.output_image_path):
+            os.makedirs(self.output_image_path)
 
 
     def loss_function(self):
@@ -78,11 +97,38 @@ class InstruemntPoseEstimation():
         self.losses = get_losses(self.configs['loss'])
         self.activation = get_activation(self.configs['loss'])
         self.metric = instrument_pose_metric(self.configs)
+    def NormalizeData(self, data):
+        return (data - np.min(data)) / (np.max(data) - np.min(data))
+    def visulization(self,i, j, epoch, image, pred, target, train_val):
+        if i == 0:
+            method = 'detection'
+        elif i == 1:
+            method = 'regression'
+        save = os.path.join(self.output_image_path, method, str(j))
+        os.makedirs(save, exist_ok=True)
+        mean=np.array([0.3315324287939336, 0.30612040989419975, 0.42873558758384006])
+        std=np.array([0.16884704188593896, 0.15812564825433872, 0.18358451252795385])
+        unnorm = UnNormalize(mean, std)
+        image = unnorm(torch.Tensor(image[0]).permute(2,0,1)).permute(1,2,0).numpy() #*std + mean
 
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        plt.subplot(1,3,1)
+        plt.imshow(image)
+        plt.xlabel('Image')
 
+        plt.subplot(1,3,2)
+        plt.imshow(self.NormalizeData(pred[0]), cmap='gray', vmin=0, vmax=1)
+        plt.xlabel('pred')
+        # plt.savefig(os.path.join(save, '{}_img_pred_{}.png'.format(train_val, str(epoch))))
+        # plt.close()
+        plt.subplot(1,3, 3)
+        plt.imshow(target[0], cmap='gray', vmin=0, vmax=1)
+        plt.xlabel('gt')
+
+        plt.savefig(os.path.join(save, '{}_img_{}.png'.format(train_val, str(epoch))))
+        plt.close()
     def train(self, epoch):
-        self.model.train()
-    
+        self.model.train()    
 
         self.train_losses = AverageMeter()
         pixel_acc_meter = SegAverageMeter()
@@ -108,34 +154,26 @@ class InstruemntPoseEstimation():
                 # outputs[i] = outputs[i].view(images.size(0), -1)
                 # labels[i] = labels[i].view(images.size(0), -1)
 
-                loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
+                loss += self.losses[i](outputs[i].view(images.size(0), 9, -1), labels[i].view(images.size(0), 9, -1)) # detection loss + regression loss
+                scores = outputs[i]
+                targets = labels[i].clone().cpu().detach().numpy()
                 
-                if i == 0:
-                    scores = outputs[i]
-                    targets = labels[i].clone().cpu().detach().numpy()
-                    for j in range(self.num_connections + self.num_parts):
-                        score = scores[:, j, ...]
-                        pred = np.ones(score.size())
-                        pred = pred * (score.clone().cpu().detach().numpy() > 0.5)
-                        target = targets[:, j, ...]
-             
+                    
+                for j in range(self.num_connections + self.num_parts):
+                    score = scores[:, j, ...]
+                    pred = np.ones(score.size())
+                    pred = pred * (score.clone().cpu().detach().numpy() > 0.5)
+                    target = targets[:, j, ...]
+                    if i == 0:
                         pixel_acc, pix = Pixel_ACC(pred, target)
                         intersection, union = IntersectionAndUnion(pred, target, numClass=2)
                 
                         pixel_acc_meter.update(pixel_acc, pix)
                         intersection_meter.update(intersection)
                         union_meter.update(union)
-
-                        if j == 0 and cnt == 0:
-                            cnt += 1
-                            plt.imshow(pred[0], cmap='gray', vmin=0, vmax=1)
-                   
-                            plt.savefig('/raid/results/pose/train_img/pred_{}.png'.format(str(epoch)))
-                            plt.close()
-                            plt.imshow(target[0], cmap='gray', vmin=0, vmax=1)
-                   
-                            plt.savefig('/raid/results/pose/train_img/gt_{}.png'.format(str(epoch)))
-                            plt.close()
+                    if batch_idx == 0:
+                        self.visulization(i, j, epoch, images.clone().permute(0, 2,3,1).cpu().detach().numpy(), score.clone().cpu().detach().numpy(), target, 'train')
+                        
             self.train_losses.update(loss.item(), images.size()[0])
         
             loss.backward()
@@ -165,7 +203,7 @@ class InstruemntPoseEstimation():
 
         with torch.no_grad():
             cnt = 0
-            for batch_idx, (images, labels) in enumerate(self.train_loader):
+            for batch_idx, (images, labels) in enumerate(self.valid_loader):
 
                 images = images.cuda()
                 labels = [i.cuda() for i in labels]
@@ -176,38 +214,30 @@ class InstruemntPoseEstimation():
                 loss = 0
                 for i in range(len(outputs)):
                     if self.activation[i] is not None:
-                        heatmap = outputs[i].clone()
                         outputs[i] = self.activation[i](outputs[i])
-                    loss += self.losses[i](outputs[i], labels[i]) # detection loss + regression loss
+                    loss += self.losses[i](outputs[i].view(images.size(0), 9, -1), labels[i].view(images.size(0), 9, -1)) # detection loss + regression loss
 
-                    if i == 0:
-                        scores = outputs[i]
-                        targets = labels[i].clone().cpu().detach().numpy()
-                        for j in range(self.num_connections + self.num_parts):
-                            score = scores[:, j, ...]
-                            pred = np.ones(score.size())
-                            pred = pred * (score.clone().cpu().detach().numpy() > 0.5)
-                            target = targets[:, j, ...]
-                
-                            pixel_acc, pix = Pixel_ACC(pred, target)
-                            intersection, union = IntersectionAndUnion(pred, target, numClass=2)
                     
+                    scores = outputs[i]
+                    targets = labels[i].clone().cpu().detach().numpy()
+                    for j in range(self.num_connections + self.num_parts):
+                        score = scores[:, j, ...]
+                        pred = np.ones(score.size())
+                        pred = pred * (score.clone().cpu().detach().numpy() > 0.5)
+                        target = targets[:, j, ...]
+                        if i == 0:
+                            pixel_acc, pix = Pixel_ACC(pred, target)
+
+                            intersection, union = IntersectionAndUnion(pred, target, numClass=2)
+                            # print('pix acc', 'intersection', 'union', pixel_acc, intersection, union)
                             pixel_acc_meter.update(pixel_acc, pix)
                             intersection_meter.update(intersection)
                             union_meter.update(union)
-                            if j == 0 and cnt == 0:
-                                plt.imshow(pred[0], cmap='gray', vmin=0, vmax=1)
-                                plt.savefig('/raid/results/pose/test_img/{}.png'.format(str(epoch)))
-                                plt.close()
-                                plt.imshow(target[0], cmap='gray', vmin=0, vmax=1)
-                   
-                                plt.savefig('/raid/results/pose/test_img/gt_{}.png'.format(str(epoch)))
-                                plt.close()
-             
-                    
+                        if batch_idx == 0:
+                            self.visulization(i, j, epoch, images.clone().permute(0, 2,3,1).cpu().detach().numpy(), score.clone().cpu().detach().numpy(), target, 'val')
             self.val_losses.update(loss.item(), images.size()[0])
 
-            parsing = self.post_processing.run(heatmap.detach().cpu().numpy(), self.configs['nms']['window'])
+            parsing = self.post_processing.run(outputs[-1].detach().cpu().numpy(), self.configs['nms']['window'])
             target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy(), 10)
             # print(parsing[0])
             # print(target_parsing[0])

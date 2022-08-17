@@ -26,7 +26,7 @@ class EndovisDataset(Dataset):
         self.regression_mask_dir = Path(regression_mask_dir)
         self.transforms = transforms
 
-        self.ids = [splitext(file)[0] for file in listdir(images_dir) if not file.startswith('.')]
+        self.ids = [splitext(file)[0] for file in sorted(listdir(images_dir)) if not file.startswith('.')]
         if not self.ids:
             raise RuntimeError(f'No input file found in {images_dir}, make sure you put your images there')
         logging.info(f'Creating dataset with {len(self.ids)} examples')
@@ -63,7 +63,7 @@ class EndovisDataset(Dataset):
         if self.transforms is not None:
             transformed = self.transforms(image=img, masks=[detection_mask, regression_mask])
             img = transformed['image']
-            detection_mask = transformed['masks'][0]
-            regression_mask = transformed['masks'][1]
+            detection_mask = transformed['masks'][0]  # + np.random.uniform(low=.01, high=.01)
+            regression_mask = transformed['masks'][1]  #+ np.random.uniform(low=-.01, high=.01)
 
-        return img, [detection_mask.permute(2, 0, 1), regression_mask.permute(2, 0, 1)]
+        return img.float(), [detection_mask.permute(2, 0, 1) , regression_mask.permute(2, 0, 1)]
