@@ -31,6 +31,14 @@ def get_optimizer(configs, model):
                     step_size=scheduler_config['lr_decay_epochs'], 
                     gamma=scheduler_config['gamma'], 
                     )
+    elif scheduler_method == 'linear_lr':
+        scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer, 
+                    start_factor= scheduler_config['start_factor'],
+                    end_factor= scheduler_config['end_factor'],
+                    total_iters= scheduler_config['total_iters'], 
+                    last_epoch= scheduler_config['last_epoch'] 
+                    )
     else:
         scheduler = None
 

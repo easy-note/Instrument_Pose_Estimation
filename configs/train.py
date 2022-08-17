@@ -50,7 +50,7 @@ optimization['epochs'] = 100
 
 scheduler = dict()
 scheduler['scheduler'] = 'linear_lr' #'step_lr' LinearLR
-scheduler['start_factor'] = 1
+scheduler['start_factor'] = 1.0
 scheduler['end_factor'] = 0
 scheduler['total_iters'] = optimization['epochs']
 scheduler['last_epoch'] = -1
