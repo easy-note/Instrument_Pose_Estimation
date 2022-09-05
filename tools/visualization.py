@@ -9,6 +9,7 @@ from post_processing import Post_Processing
 import seaborn as sns
 import matplotlib.pylab as plt
 from utils.line_integral import get_points
+
 class Visualization():
     def __init__(self, mode='test', dest_path=None):
 
@@ -23,6 +24,7 @@ class Visualization():
         
         self.joint_color = ['r', 'y', 'g', 'b', 'm']
         self.post_processing = Post_Processing()
+    
     def list_load(self): # GT annotation 읽기 
         for filename in self.gt_list:
 
@@ -46,6 +48,7 @@ class Visualization():
                         yxlabel[1][self.joint[tools['class']]] = int(tools['y']) , int(tools['x'])
 
                 self.show(image, yxlabel, gt['filename'][idx].split('/')[-1].split('.')[0])
+    
     def regression_pp_list_load(self, img_path): # GT annotation 읽기 
         for filename in sorted(os.listdir(self.regression_list)):
 
@@ -62,9 +65,6 @@ class Visualization():
             self.show(image, label, filename.split('.')[0])
     
     def show_heatmap(self, image, heatmap, title):
-  
-        
-
         data = np.sum(heatmap[:,:,:5], axis=2)
         plt.imshow(image)
         # ax = sns.heatmap(data, linewidth=0.3)
@@ -92,14 +92,19 @@ class Visualization():
                     point = tool[multiple_tools_idx][point_idx] 
                     if len(point) == 0:
                         continue
-                    x, y = point
+                    # x, y = point
+                    y, x = point
              
                     if y == -1 or x == -1:
                         continue
                     plt.plot(x, y, color=self.joint_color[multiple_tools_idx], marker='o', markersize=5)
+        
         # print(self.dest_path, title)
         plt.savefig(os.path.join(self.dest_path, title.split('.')[0] + '.png'))
         plt.close()
+
+    def output_overlap(self, image, label, title):
+        
 
     
 

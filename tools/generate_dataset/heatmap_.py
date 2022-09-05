@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def eval_gaussian(mu, sigma=20., h=480, w=640):
+def eval_gaussian(mu, sigma=10., h=480, w=640):
 
     mu_np = np.array(mu, dtype=np.float32).reshape(1, 2)
     x = np.linspace(0, w-1, w)

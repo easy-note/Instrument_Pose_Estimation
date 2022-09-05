@@ -14,7 +14,7 @@ class Post_Processing():
         # joint1, joint2, joint1-joint2 pair id
         self.joint_pair_list = [(0, 2, 5), (1, 2, 6), (2, 3, 7), (3, 4, 8)]
  
-    def run(self, bacth_iamges , window=20):
+    def run(self, bacth_iamges, window=20):
         result_batches = []
         T = 20
         for heatmap in bacth_iamges:
@@ -44,57 +44,89 @@ class Post_Processing():
             #         else:
             #             final_prediction[i] = []
             # inst = len(parsed)
+        
             result_batches.append(list(zip(*parsed)))
+        
             # print(list(zip(*parsed)))
             # result_batches.append(final_prediction)
+        
         return result_batches
 
     def pred_init(self, heatmap, window):
         _, heatmap[:, :, :self.num_parts] = nms(heatmap[:, :, :self.num_parts], self.num_parts, window)
+        
         mask = cv2.addWeighted(heatmap[:, :, 5:], 1, cv2.GaussianBlur(heatmap[:, :, 5:], (20+1, 20+1), 0), -1, 0)
         heatmap[:, :, 5:] += mask
         loc_pred = [[] for i in range(self.num_parts)]  
         candidates_num = 5
-        for i in range(self.num_parts):
+        for i in range(self.num_parts): #5
             image = heatmap[:, :, i].copy()
             # print(i, np.sum(image))
-            for j in range(candidates_num):
+            for j in range(candidates_num): #5
                 _, max_val , _, max_loc = cv2.minMaxLoc(image)
                 if max_loc[0] == max_loc[1] == 0:
                     break
-                loc_pred[i].append(max_loc)
-                y, x = max_loc
+                
+                x, y = max_loc
+                loc_pred[i].append([y, x])
+                
+                image[y-5:y+5, x-5:x+5] = 0.
 
-                image[x-5:x+5, y-5:y+5] = 0.
-       
         return  loc_pred
 
     
 
     def bipartite_graph_matching(self, heatmap, window):
+
+        def tmp_(matching_scores):
+            row_idx = []
+            col_idx = []
+
+            try:
+                for idx, r in enumerate(matching_scores):
+                    x = r.argmax()
+                    row_idx.append(idx)
+                    col_idx.append(x)
+
+                row_idx = np.array(row_idx)
+                col_idx = np.array(col_idx)
+            
+            except:
+                row_idx = np.array([])
+                col_idx = np.array([])
+            
+            return row_idx, col_idx
         
-        loc_pred = self.pred_init(heatmap, window)
+        loc_pred = self.pred_init(heatmap, window) # [[(140, 61), (172, 124), (269, 210)], [(141, 60), (172, 124), (269, 210)], [(175, 54), (135, 139)], [(208, 61), (92, 156)], [(10, 13), (308, 69), (13, 190)]]
 
         candidates = [[] for i in range(self.num_connections)]  
         
-
-        for idx, tmp in enumerate(self.joint_pair_list):
+        for idx, tmp in enumerate(self.joint_pair_list): # [(0, 2, 5), (1, 2, 6), (2, 3, 7), (3, 4, 8)]
 
             joint_idx1, joint_idx2, connection_idx = tmp[0], tmp[1], tmp[2]
 
             matching_scores = np.zeros((len(loc_pred[joint_idx1]), len(loc_pred[joint_idx2])), dtype=np.float32)
 
-            for idx1, pt1 in enumerate(loc_pred[joint_idx1]):
-                for idx2, pt2 in enumerate(loc_pred[joint_idx2]):
+            for idx1, pt1 in enumerate(loc_pred[joint_idx1]): #3
+                for idx2, pt2 in enumerate(loc_pred[joint_idx2]): #2
                     # 해당 라인의 weight들을 더함
                     matching_scores[idx1, idx2] = compute_integral(pt1, pt2, heatmap[:, :, connection_idx])
+                    print(idx1, pt1, idx2, pt2, matching_scores[idx1, idx2])
                     # print("left2head", matching_scores)
+                    
+                    ## issue : pt 2개 겹침 (ㅠㅠ) & gt 가 2개 나옴 & 코드 정리 (WandB, tensorflow)
+                    ## TODO augmentation 수정, 파라미터 수정
 
- 
+            print('matching_scores \n', matching_scores)
+
             row_idx, col_idx = linear_sum_assignment(-matching_scores) # minimum weight matching in bipartite graphs.
-
+            # row_idx, col_idx = tmp_(matching_scores) # minimum weight matching in bipartite graphs.
+            
+            print('row_idx, col_idx ', row_idx, col_idx)
+            print('\n')
+            
             for r, c in zip(row_idx, col_idx):
-                candidates[idx].append((loc_pred[joint_idx1][r], loc_pred[joint_idx2][c]))
+                candidates[idx].append((loc_pred[joint_idx1][r], loc_pred[joint_idx2][c]))   
 
         return candidates
 

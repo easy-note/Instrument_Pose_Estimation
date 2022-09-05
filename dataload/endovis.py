@@ -66,4 +66,4 @@ class EndovisDataset(Dataset):
             detection_mask = transformed['masks'][0]  # + np.random.uniform(low=.01, high=.01)
             regression_mask = transformed['masks'][1]  #+ np.random.uniform(low=-.01, high=.01)
 
-        return img.float(), [detection_mask.permute(2, 0, 1) , regression_mask.permute(2, 0, 1)]
+        return img.float(), [detection_mask.permute(2, 0, 1) , regression_mask.permute(2, 0, 1)], name

@@ -24,6 +24,7 @@ def main():
 
 
 def ENDOVIS(args):
+    print('hi')
     endovis_error = []
 
     def anno_sanity_check(tool1, tool2):
@@ -39,7 +40,7 @@ def ENDOVIS(args):
     num_connections = 4
 
     read_folder_name = ("train_labels", "test_labels")
-    save_folder_name = ("segmentation_training_labels", "segmentation_test_labels")
+    save_folder_name = ("segmentation_training_labels_raduis10", "segmentation_test_labels_raduis10")
     num_instruments = {}
 
     for i in range(2):
@@ -109,7 +110,7 @@ def ENDOVIS(args):
                         idx = mapper[e["class"]]
                         part_coord[e["class"]].append((e["x"], e["y"], e["id"]))
 
-                        seg_map[:, :, idx] += cv2.circle(np.array(seg_map[:,:, idx]), (int(e['x']), int(e['y'])), 20, (255, 0, 0), -1)
+                        seg_map[:, :, idx] += cv2.circle(np.array(seg_map[:,:, idx]), (int(e['x']), int(e['y'])), 10, 1, -1)
                         
                         counter += 1
 
@@ -139,7 +140,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["LeftClasperPoint"][idx]
                         pt3, pt4, _ = part_coord["HeadPoint"][idx]
 
-                        seg_map[:, :, 5] += cv2.line(np.array(seg_map[:,:, 5]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 5] += cv2.line(np.array(seg_map[:,:, 5]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, 10)
                                          
 
                     except:
@@ -156,7 +157,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["RightClasperPoint"][idx]
                         pt3, pt4, _ = part_coord["HeadPoint"][idx]
 
-                        seg_map[:, :, 6] += cv2.line(np.array(seg_map[:,:, 6]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 6] += cv2.line(np.array(seg_map[:,:, 6]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, 10)
                     except:
                         pass
                     
@@ -171,7 +172,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["HeadPoint"][idx]
                         pt3, pt4, _ = part_coord["ShaftPoint"][idx]
 
-                        seg_map[:, :, 7] += cv2.line(np.array(seg_map[:,:, 7]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 7] += cv2.line(np.array(seg_map[:,:, 7]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, 10)
                     except:
                         pass
                     
@@ -186,7 +187,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["ShaftPoint"][idx]
                         pt3, pt4, _ = part_coord["EndPoint"][idx]
 
-                        seg_map[:, :, 8] += cv2.line(np.array(seg_map[:,:, 8]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 8] += cv2.line(np.array(seg_map[:,:, 8]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, 10)
                     except:
                         pass                 
 
@@ -231,5 +232,5 @@ def visaul(set_no):
 
 
 if __name__ == "__main__":
-    # main()
-    visaul(4)
+    main()
+    # visaul(4)

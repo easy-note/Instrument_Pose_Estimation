@@ -4,8 +4,8 @@ import os
 from glob import glob
 import argparse
 import json
-from utils.annotation_parser import parse_annotation
-from utils.heatmap_ import eval_gaussian, eval_line
+# from utils.annotation_parser import parse_annotation
+from heatmap_ import eval_gaussian, eval_line
 
 import natsort
 import csv
@@ -42,7 +42,7 @@ def ENDOVIS(args):
     num_connections = 4
 
     read_folder_name = ("train_labels", "test_labels")
-    save_folder_name = ("training_labels_postprocessing_v2", "test_labels_postprocessing_v2")
+    save_folder_name = ("regression_training_labels_raduis10", "regression_test_labels_raduis10")
     num_instruments = {}
 
     for i in range(2):
@@ -80,7 +80,7 @@ def ENDOVIS(args):
 
             for element in dict_list:
                 save_flag = True
-                print(element['filename'])
+                # print(element['filename'])
                 ## -------- 3. specific video only -------- ##
                 # if element['filename'] != '/Users/xiaofeidu/mData/MICCAI_tool/Tracking_Robotic_Testing/Dataset5/Raw/img_0825.png':
                 # if element['filename'] == '/Users/xiaofeidu/mData/MICCAI_tool/Tracking_Robotic_Training/Training/Dataset1/Raw/img_000130_raw.png':
@@ -281,7 +281,7 @@ def ENDOVIS(args):
         write.writerows(endovis_error)
 
 
-
+'''
 def RMIT(args):
     save_dir = args.save_dir + "/heatmaps"
 
@@ -302,7 +302,7 @@ def RMIT(args):
             heatmap[:, :, 2] = eval_gaussian(data["p3"][j])
             heatmap[:, :, 3] = eval_gaussian(data["p4"][j])
             np.save(save_dir + "/" + data["fname"][j] + ".npy", heatmap)
-
+'''
 
 if __name__ == "__main__":
     main()
