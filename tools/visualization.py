@@ -92,7 +92,7 @@ class Visualization():
                     point = tool[multiple_tools_idx][point_idx] 
                     if len(point) == 0:
                         continue
-                    x, y = point
+                    y, x = point
              
                     if y == -1 or x == -1:
                         continue

@@ -24,6 +24,7 @@ def main():
 
 
 def ENDOVIS(args):
+    print('hi')
     endovis_error = []
 
     def anno_sanity_check(tool1, tool2):
@@ -37,9 +38,9 @@ def ENDOVIS(args):
 
     num_classes = 5
     num_connections = 4
-
+    radian = 15
     read_folder_name = ("train_labels", "test_labels")
-    save_folder_name = ("segmentation_training_labels", "segmentation_test_labels")
+    save_folder_name = ("segmentation_training_labels_raduis{}".format(str(radian)), "segmentation_test_labels_raduis{}".format(str(radian)))
     num_instruments = {}
 
     for i in range(2):
@@ -69,8 +70,8 @@ def ENDOVIS(args):
                 seq_id = json_.split("/")[-1]
                 seq_id = seq_id.split("_")[0]
                 
-            print('\nseq_id : ', seq_id)
-
+            # print('\nseq_id : ', seq_id)
+            print(json_)
             # ## -------- 2. test5 only -------- ##
             # if seq_id != 'test5':
             #     continue
@@ -108,8 +109,8 @@ def ENDOVIS(args):
                     if e["class"] in mapper.keys():                     
                         idx = mapper[e["class"]]
                         part_coord[e["class"]].append((e["x"], e["y"], e["id"]))
-
-                        seg_map[:, :, idx] += cv2.circle(np.array(seg_map[:,:, idx]), (int(e['x']), int(e['y'])), 20, (255, 0, 0), -1)
+                    
+                        seg_map[:, :, idx] = cv2.circle(np.array(seg_map[:,:, idx]), (int(e['x']), int(e['y'])), radian, 1, -1)
                         
                         counter += 1
 
@@ -117,14 +118,15 @@ def ENDOVIS(args):
                         # coloredImg = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
                         # cv2.imwrite('filename2.jpeg', seg_map[:, :, idx]+coloredImg)
-            
+
+     
                 fname = element["filename"].split("/")[-1]
                 fname = fname.split(".")[0] + "_" + seq_id + ".npy"
                 num_instruments[fname] = counter // num_classes
                 # print(fname)
                 # return
 
-                print(part_coord)
+                # print(part_coord)
 
                 # determine the connections
                 for idx in range(counter // num_classes + 1):
@@ -139,7 +141,7 @@ def ENDOVIS(args):
                         pt1, pt2, _ = part_coord["LeftClasperPoint"][idx]
                         pt3, pt4, _ = part_coord["HeadPoint"][idx]
 
-                        seg_map[:, :, 5] += cv2.line(np.array(seg_map[:,:, 5]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 5] = cv2.line(np.array(seg_map[:,:, 5]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, radian)
                                          
 
                     except:
@@ -150,13 +152,13 @@ def ENDOVIS(args):
                         if anno_sanity_check(part_coord["RightClasperPoint"][idx], part_coord["HeadPoint"][idx]) != True:
                             endovis_error.append([seq_id, element['filename']])
                             save_flag = False
-                            print('endovis error : {}'.format(endovis_error))
+                            # print('endovis error : {}'.format(endovis_error))
                             break
 
                         pt1, pt2, _ = part_coord["RightClasperPoint"][idx]
                         pt3, pt4, _ = part_coord["HeadPoint"][idx]
 
-                        seg_map[:, :, 6] += cv2.line(np.array(seg_map[:,:, 6]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 6] = cv2.line(np.array(seg_map[:,:, 6]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, radian)
                     except:
                         pass
                     
@@ -165,13 +167,13 @@ def ENDOVIS(args):
                         if anno_sanity_check(part_coord["HeadPoint"][idx], part_coord["ShaftPoint"][idx]) != True:
                             endovis_error.append([seq_id, element['filename']])
                             save_flag = False
-                            print('endovis error : {}'.format(endovis_error))
+                            # print('endovis error : {}'.format(endovis_error))
                             break
 
                         pt1, pt2, _ = part_coord["HeadPoint"][idx]
                         pt3, pt4, _ = part_coord["ShaftPoint"][idx]
 
-                        seg_map[:, :, 7] += cv2.line(np.array(seg_map[:,:, 7]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 7] = cv2.line(np.array(seg_map[:,:, 7]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, radian)
                     except:
                         pass
                     
@@ -180,13 +182,13 @@ def ENDOVIS(args):
                         if anno_sanity_check(part_coord["ShaftPoint"][idx], part_coord["EndPoint"][idx]) != True:
                             endovis_error.append([seq_id, element['filename']])
                             save_flag = False
-                            print('endovis error : {}'.format(endovis_error))
+                            # print('endovis error : {}'.format(endovis_error))
                             break
 
                         pt1, pt2, _ = part_coord["ShaftPoint"][idx]
                         pt3, pt4, _ = part_coord["EndPoint"][idx]
 
-                        seg_map[:, :, 8] += cv2.line(np.array(seg_map[:,:, 8]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), (255, 0, 0), 20)
+                        seg_map[:, :, 8] = cv2.line(np.array(seg_map[:,:, 8]), (int(pt1), int(pt2)), (int(pt3), int(pt4)), 1, radian)
                     except:
                         pass                 
 
@@ -231,5 +233,5 @@ def visaul(set_no):
 
 
 if __name__ == "__main__":
-    # main()
-    visaul(4)
+    main()
+    # visaul(4)

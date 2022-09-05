@@ -49,13 +49,13 @@ class UnNormalize(object):
 
 class TestInstruemntPoseEstimation():
     def __init__(self, configs):
-        self.configs = configs.configs
+        self.configs = configs
 
         # Detect devices
         use_cuda = torch.cuda.is_available()                   # check if GPU exists
         self.device = torch.device("cuda" if use_cuda else "cpu")   # use CPU or GPU
             
-        _, _, self.test_loader = get_dataloaders(configs)
+        _, _, self.test_loader = get_dataloaders(configs.dataset)
 
         # model load
         self.model = model_dict[configs['model']['method']](configs=configs)
@@ -63,30 +63,30 @@ class TestInstruemntPoseEstimation():
         state_dict = {str.replace(k,'module.',''): v for k,v in checkpoint['state_dict'].items()}
         self.model.load_state_dict(state_dict)
         self.model.to(self.device)
-        self.visualization = Visualization(dest_path = self.configs['dest_path'] + '/test_vis')
-        self.visualization_gt = Visualization(dest_path = self.configs['dest_path'] + '/test_vis_gt')
+        self.visualization = Visualization(dest_path = self.configs.dest_path + '/test_vis')
+        self.visualization_gt = Visualization(dest_path = self.configs.dest_path + '/test_vis_gt')
         # set optimiation / scheduler
         self.record_set()
         self.loss_function()
 
-        self.image_list = sorted(os.listdir(self.configs['dataset']['images_dir']['test']))
+        self.image_list = sorted(os.listdir(self.configs.dataset['images_dir']['test']))
         # instrument parsing
-        self.post_processing = Post_Processing(self.configs['dataset']['num_parts'],  configs['dataset']['num_connections'])
+        self.post_processing = Post_Processing(self.configs.dataset['num_parts'],  configs['dataset']['num_connections'])
         
     def record_set(self):
     
 
-        self.test_logger = Logger(os.path.join(self.configs['dest_path'], 'test_vis', 'perform.log'),
+        self.test_logger = Logger(os.path.join(self.configs.dest_path, 'test_vis', 'perform.log'),
                                         ['left', 'right', 'head', 'shaft', 'end', 'rmse'])
 
         
-        self.mean = self.configs['dataset']['normalization']['mean']
-        self.std = self.configs['dataset']['normalization']['std']
+        self.mean = self.configs.dataset['normalization']['mean']
+        self.std = self.configs.dataset['normalization']['std']
         self.unnorm = UnNormalize(self.mean, self.std)
 
     def loss_function(self):
-        self.losses = get_losses(self.configs['loss'])
-        self.activation = get_activation(self.configs['loss'])
+        self.losses = get_losses(self.configs.loss)
+        self.activation = get_activation(self.configs.loss)
         self.metric = instrument_pose_metric(self.configs)
 
 
@@ -118,7 +118,7 @@ class TestInstruemntPoseEstimation():
                 outputs  = self.model(images)[-1].detach().cpu().numpy()
           
      
-                parsing = self.post_processing.run(outputs, self.configs['nms']['window'])
+                parsing = self.post_processing.run(outputs, self.configs.post_process['nms']['window'])
                 target_parsing = self.post_processing.run(labels[-1].detach().cpu().numpy(), 5)
 
                 n = images.size(0)
@@ -154,7 +154,7 @@ class TestInstruemntPoseEstimation():
                 
 
         print("LeftClasper", "RightClasper", "Head", "Shaft", "End", "Total")
-        for i in range(self.configs['dataset']['num_parts']):
+        for i in range(self.configs.dataset['num_parts']):
             print("{:.2f} / {:.2f} / {:.2f}".format(precision_tools[i].avg, recall_tools[i].avg,  rmse_tools[i].avg), end=' | ')
         print("{:.2f} / {:.2f} / {:.2f}".format(totals[0].avg, totals[1].avg, totals[2].avg), )
     def run(self):

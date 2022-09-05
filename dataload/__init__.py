@@ -7,14 +7,13 @@ import albumentations.pytorch as AP
 
 
 __all__ = [
-    'BasicDataset', 'CarvanaDataset'
+    'BasicDataset', 'CarvanaDataset', 'EndovisDataset'
 ]
 '''
 dataset['img_size'] = (256,320)
 '''
 def get_dataloaders(configs):
-    configs = configs['dataset'] 
-    
+     
     
     train_transform = A.Compose(get_augmentation(configs, 'train'), p=1 )
     val_transform = A.Compose(get_augmentation(configs, 'val'), p=1)
@@ -52,28 +51,22 @@ def get_dataloaders(configs):
 def get_augmentation(configs, mode):
 
     width, height = configs['img_size']
-    trans = [A.Resize(width=width, height=height )]
+    trans = [A.Resize(height=height, width=width)]
 
-    # for method in configs['augmentation'][mode]:
-    #     if method == 'verticalflip':
-    #         trans.append(A.VerticalFlip(0.7))
-    #     elif method == 'horizonflip':
-    #         trans.append(A.HorizontalFlip(0.7))
     if mode == 'train':
-        trans.append(A.RandomResizedCrop(height=height, width=width, scale=(0.7, 0.8)))
-        trans.append(A.ShiftScaleRotate(scale_limit=[-0.3, 0.35], rotate_limit=[-45,45]))
+        trans.append(A.HorizontalFlip(p=0.5))
+        trans.append(A.ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=[-45,45]))
+        
+        # trans.append(A.OneOf([
+        #     A.HorizontalFlip(p=0.5),
+        #     A.VerticalFlip(p=0.5),
+        # ], p=1))
+        # trans.append(A.OneOf([
+        #     A.ElasticTransform(p=0.5, alpha=120, sigma=120 * 0.05, alpha_affine=120 * 0.03),
+        #     A.GridDistortion(p=0.5),
+        #     A.OpticalDistortion(distort_limit=1, shift_limit=0.5, p=1),
+        # ], p=0.8))
 
-
-    
-        trans.append(A.OneOf([
-            A.Blur(),
-            A.RandomBrightnessContrast(p=0.2)
-        ]))
-        trans.append(A.OneOf([
-            A.VerticalFlip(p=1)
-            A.HorizontalFlip(p=1)
-        ]))
-    
     mean, std = configs['normalization']['mean'], configs['normalization']['std']
     trans.append(A.Normalize(mean=mean, std=std))
     trans.append(AP.transforms.ToTensorV2())

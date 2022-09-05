@@ -24,8 +24,20 @@ def get_points(point1, point2):
         y_s = np.linspace(start=min(point1[0], point2[0]), stop=max(point1[0], point2[0]), num=number_of_samples)
         x_s = (y_s - b) / (m + 1e-9)
 
+    # # y 256 , x 320
+    # y, x = [], []
+    # for i in y_s:
+    #     if 0 <= i < 256:
+    #         y.append(i)
+
+    # for i in x_s:
+    #     if 0 <= i < 320:
+    #         x.append(i)
+    # print(point1, point2)
+    # print(y_s.astype(np.int32))
+    # print(np.array(y))
     points = [y_s.astype(np.int32), x_s.astype(np.int32)]
-    
+    # points = [np.array(y).astype(np.int32), np.array(x).astype(np.int32)]
     return points, number_of_samples
 
 def compute_integral(pt1, pt2, connectivity):
@@ -35,10 +47,10 @@ def compute_integral(pt1, pt2, connectivity):
     points, num_points = get_points(pt1, pt2)
 
     # integral
-    try:
-        score = connectivity[points].sum()
-    except IndexError:  # basically no connectivity
-        score = -200
+    # try:
+    score = connectivity[points].sum()
+    # except IndexError:  # basically no connectivity
+    #     score = -200
 
     return score
 

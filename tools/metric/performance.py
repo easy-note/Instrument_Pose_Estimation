@@ -10,9 +10,9 @@ from post_processing import Post_Processing
 
 class instrument_pose_metric():
     def __init__(self, configs):
-        self.threshold = configs['metric']['threshold'] 
+        self.threshold = configs.metric['threshold'] 
 
-        self.joint_num = configs['dataset']['num_parts'] 
+        self.joint_num = configs.dataset['num_parts'] 
 
     def forward(self, preds, targets):
         # preds = preds.cpu().numpy()

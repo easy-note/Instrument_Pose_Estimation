@@ -1,12 +1,10 @@
-configs = dict()
-
 # Dataset
 dataset = dict()
 dataset['dataset'] = 'endovis'
 dataset['normalization'] = dict()
 dataset['normalization']['mean'] =[0.5, 0.5, 0.5]
 dataset['normalization']['std'] = [0.5, 0.5, 0.5]
-dataset['batch_size'] = 3
+dataset['batch_size'] = 5
 dataset['shuffle'] = True
 dataset['num_workers'] = 6
 dataset['pin_memory'] = True
@@ -35,10 +33,8 @@ dataset['n_class'] = 9
 dataset['num_parts'] = 5
 dataset['num_connections'] = 4
 
-configs['dataset'] = dataset
 
-configs['nms'] = dict()
-configs['nms']['window'] = 20
+
 
 # Optimization & Scheduler
 optimization = dict()
@@ -56,8 +52,6 @@ scheduler['total_iters'] = optimization['epochs']
 scheduler['last_epoch'] = -1
 scheduler['gamma'] = 0.1 # 0.05
 
-configs['optimization'] = optimization
-configs['scheduler'] = scheduler
 
 # Loss
 loss = dict()
@@ -67,22 +61,71 @@ loss['activation'] = [None, None]
 loss['reduction'] = 'mean'
 loss['weight'] = [None, None]#[ [0.1, 0.9], [0.1, 0.9]]
 loss['label_smoothing'] = [0.0, 0.0]
-configs['loss'] = loss
+
 
 # Model
 model = dict()
 model['method'] = 'endovis_network'
 model['n_channels'] = 64
 model['bilinear'] = False
-configs['model'] = model
+
 
 # Metric
 metric = dict()
 metric['metric'] = 'rms' # root mean square
 metric['threshold'] = 20
-configs['metric'] = metric
 
+
+
+# Post processing
+post_process = dict()
+post_process['nms'] = dict()
+post_process['nms']['window'] = 20
 
 # Defuat
-configs['results'] = '/raid/results/optimal_surgery/endovis'
+results = '/raid/results/optimal_surgery/endovis'
 
+from datetime import datetime
+date = datetime.today().strftime("%Y%m%d%H%M") 
+
+project_name = 'G_IPE_CV'
+run_name = "baseline_except_vertical_flip_{}".format(date)
+
+
+import math
+
+sweep_config = {
+    'project' : 'G_IPE_CV',
+    'entity': 'vision_ai',
+    'program': 'train.py',
+    'metric' : {
+        'name': 'val_loss',
+        'goal': 'minimize'   
+        },
+    'parameters' : {
+        'optimizer': {
+            'values': ['adam', 'sgd']
+            },
+ 
+        'epochs': {
+            'values': [50, 100]
+            },
+        'learning_rate': {
+            'distribution': 'uniform',
+            'min': 0,
+            'max': 0.1
+            },
+        'batch_size': {
+            'distribution': 'q_log_uniform',
+            'q': 1,
+            'min': math.log(32),
+            'max': math.log(256),
+            }
+        },
+    'early_terminate':{
+        'type': 'hyperband',
+        's': 2,
+        'eta': 3,
+        'max_iter': 27,
+        },
+    }

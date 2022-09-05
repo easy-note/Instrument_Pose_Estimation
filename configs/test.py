@@ -1,7 +1,7 @@
-configs = dict()
+
 # Defuat
-configs['dest_path'] = '//raid/results/optimal_surgery/endovis/\
-endovis/endovis_network/202208160728'
+dest_path = '//raid/results/optimal_surgery/endovis/\
+endovis/endovis_network/202208300920/'
 
 # Dataset
 dataset = dict()
@@ -40,11 +40,12 @@ dataset['n_class'] = 9
 dataset['num_parts'] = 5
 dataset['num_connections'] = 4
 
-configs['dataset'] = dataset
 
+# Post processing
+post_process = dict()
+post_process['nms'] = dict()
+post_process['nms']['window'] = 100
 
-configs['nms'] = dict()
-configs['nms']['window'] = 100
 # Loss
 loss = dict()
 
@@ -53,23 +54,16 @@ loss['activation'] = 'sigmoid'
 loss['reduction'] = 'mean'
 loss['weight'] = [ None]
 loss['label_smoothing'] = [0.0]
-configs['loss'] = loss
 
 # Model
 model = dict()
 model['method'] = 'endovis_network'
 model['n_channels'] = 64
 model['bilinear'] = False
-model['checkpoint'] = configs['dest_path'] + '/models/lastest.pth'
-configs['model'] = model
+model['checkpoint'] = dest_path + '/models/lastest.pth'
 
 # Metric
 metric = dict()
 metric['metric'] = 'rms' # root mean square
 metric['threshold'] = 20
-configs['metric'] = metric
-
-
-# Defuat
-
 

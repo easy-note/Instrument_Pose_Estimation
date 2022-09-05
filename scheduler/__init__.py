@@ -1,7 +1,7 @@
 import torch 
 
 def get_optimizer(configs, model):
-    optim_cofig = configs['optimization']
+    optim_cofig = configs.optimization
     optim_method = optim_cofig['optim']
     lr = optim_cofig['init_lr']
     momentum = optim_cofig['momentum']
@@ -22,7 +22,7 @@ def get_optimizer(configs, model):
                     weight_decay=weight_decay)
 #    ====================================================================================   
 
-    scheduler_config = configs['scheduler']
+    scheduler_config = configs.scheduler
     scheduler_method = scheduler_config['scheduler']
                 
     if scheduler_method == 'step_lr':

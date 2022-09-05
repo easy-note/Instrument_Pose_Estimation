@@ -62,10 +62,11 @@ class Post_Processing():
                 _, max_val , _, max_loc = cv2.minMaxLoc(image)
                 if max_loc[0] == max_loc[1] == 0:
                     break
-                loc_pred[i].append(max_loc)
-                y, x = max_loc
+                x, y = max_loc
+                loc_pred[i].append([y, x])
+                
 
-                image[x-5:x+5, y-5:y+5] = 0.
+                image[y-5:y+5, x-5:x+5] = 0.
        
         return  loc_pred
 
