@@ -312,7 +312,8 @@ if __name__ == '__main__':
     }
  
     wandb.login()
-    wandb.init(project=cfg.project_name, entity="vision_ai", config=config_dictionary)
+    # wandb.init(project=cfg.project_name, entity="vision_ai", config=config_dictionary)
+    wandb.init(project=cfg.project_name, entity="jihyunlee98", config=config_dictionary)
     # cfg.merge_from_dict(args.cfg_options)
     wandb.run.name = cfg.run_name
     wandb.run.save()

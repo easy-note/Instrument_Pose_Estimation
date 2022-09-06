@@ -1,3 +1,10 @@
 ## images
-*img
+tools/generate_dataset/images
+*img*
+
+## configs (Server)
+configs/jhlee/
+
+## wandb
+wandb
 
