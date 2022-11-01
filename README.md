@@ -9,7 +9,12 @@ Models
 Dataset
 -------------
 - Endovis dataset [link](https://www.notion.so/Task-Endovis-dataset-a7156a98b4bb4a67b377a3038a242051)
- 
+- dataset 생성 
+- segmentation 생성
+<pre><code>python tools/generate_segmentation_map.py </code></pre> 
+- heatmap 생성
+<pre><code>python tools/generate_heatmap.py </code></pre> 
+  
 Post Processing
 -------------
  - Multi instrument parsing (bottom up method)
